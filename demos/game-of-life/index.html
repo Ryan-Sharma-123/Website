@@ -5,15 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Game of Life</title>
 <style>
-  :root { --bg:#0c1122; --line:rgba(255,255,255,.08); --text:#eef2ff; --muted:#98a3bd; --accent:#ff7a1a; --accent2:#6d8bd6; }
+  :root { --bg:#181b2b; --line:rgba(255,255,255,.08); --text:#eef2ff; --muted:#98a3bd; --accent:#8ab4ff; --accent2:#b9a6ff; }
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:"DM Sans", system-ui, sans-serif; overflow:hidden; }
   .wrap { display:flex; flex-direction:column; height:100%; }
   canvas { flex:1; width:100%; display:block; cursor:crosshair; touch-action:none; }
-  .bar { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem; padding:.5rem .6rem; border-top:1px solid var(--line); background:#0a0e1c; font-family:"Space Mono", ui-monospace, monospace; font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; }
+  .bar { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem; padding:.5rem .6rem; border-top:1px solid var(--line); background:#12141f; font-family:"Space Mono", ui-monospace, monospace; font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; }
   button { font:inherit; letter-spacing:inherit; text-transform:inherit; color:var(--text); background:none; border:1px solid rgba(255,255,255,.2); border-radius:2rem; padding:.42rem .7rem; cursor:pointer; }
   button:hover { border-color:var(--accent); }
-  button.primary { background:var(--accent); border-color:var(--accent); color:#180b00; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#0b1020; }
   label { display:inline-flex; align-items:center; gap:.4rem; color:var(--muted); margin-left:.3rem; }
   input[type=range] { width:90px; accent-color:var(--accent); }
   .gen { margin-left:auto; color:var(--muted); }
@@ -71,12 +71,12 @@
   }
   function draw() {
     var w = canvas.clientWidth, h = canvas.clientHeight;
-    ctx.fillStyle = '#0c1122'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#181b2b'; ctx.fillRect(0, 0, w, h);
     ctx.strokeStyle = 'rgba(255,255,255,.05)'; ctx.lineWidth = 1; ctx.beginPath();
     for (var x = 0; x <= cols; x++) { ctx.moveTo(x * CELL + .5, 0); ctx.lineTo(x * CELL + .5, rows * CELL); }
     for (var y = 0; y <= rows; y++) { ctx.moveTo(0, y * CELL + .5); ctx.lineTo(cols * CELL, y * CELL + .5); }
     ctx.stroke();
-    ctx.fillStyle = '#ff7a1a';
+    ctx.fillStyle = '#8ab4ff';
     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) if (grid[r * cols + c]) ctx.fillRect(c * CELL + 1.5, r * CELL + 1.5, CELL - 3, CELL - 3);
   }
   function updateGen() { document.getElementById('gen').textContent = gen; }

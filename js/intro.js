@@ -73,7 +73,7 @@ window.Intro = (function () {
   }
   function blend(a, b, u) {
     var o = {};
-    for (var k in a) o[k] = typeof a[k] === 'number' && typeof b[k] === 'number' ? a[k] + (b[k] - a[k]) * u : (u < 0.5 ? a[k] : b[k]);
+    for (var k in a) o[k] = (typeof a[k] === 'number' && typeof b[k] === 'number') ? a[k] + (b[k] - a[k]) * u : (b[k] === undefined ? a[k] : (u < 0.5 ? a[k] : b[k]));
     for (var k2 in b) if (!(k2 in o)) o[k2] = b[k2];
     return o;
   }
@@ -280,9 +280,9 @@ window.Intro = (function () {
     var svg = dom.svg = el('svg', { class: 'scene', viewBox: '0 0 ' + VW + ' ' + VH, preserveAspectRatio: 'xMidYMid slice', 'aria-hidden': 'true' }, root);
     var defs = el('defs', {}, svg);
     var sky = el('linearGradient', { id: 'in-sky', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-    el('stop', { offset: 0, 'stop-color': '#05070f' }, sky); el('stop', { offset: 0.72, 'stop-color': '#0a0f22' }, sky); el('stop', { offset: 1, 'stop-color': '#1a1224' }, sky);
+    el('stop', { offset: 0, 'stop-color': '#0e1019' }, sky); el('stop', { offset: 0.72, 'stop-color': '#151a33' }, sky); el('stop', { offset: 1, 'stop-color': '#1c1b3d' }, sky);
     var glow = el('radialGradient', { id: 'in-glow', cx: 0.5, cy: 1, r: 0.8 }, defs);
-    el('stop', { offset: 0, 'stop-color': '#ff7a1a', 'stop-opacity': 0.28 }, glow); el('stop', { offset: 1, 'stop-color': '#ff7a1a', 'stop-opacity': 0 }, glow);
+    el('stop', { offset: 0, 'stop-color': '#8ab4ff', 'stop-opacity': 0.26 }, glow); el('stop', { offset: 1, 'stop-color': '#8ab4ff', 'stop-opacity': 0 }, glow);
     var mesh = el('pattern', { id: 'in-mesh', width: 9, height: 9, patternUnits: 'userSpaceOnUse' }, defs);
     el('path', { d: 'M9,0H0V9', fill: 'none', stroke: '#ffffff', 'stroke-opacity': 0.45, 'stroke-width': 1 }, mesh);
     var blur = el('filter', { id: 'in-blur', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
@@ -297,17 +297,17 @@ window.Intro = (function () {
     el('rect', { width: VW, height: VH, fill: 'url(#in-sky)' }, s1);
     el('rect', { width: VW, height: VH, fill: 'url(#in-glow)' }, s1);
     // floor grid (perspective) + court lines
-    var floor = el('g', { stroke: '#ff7a1a', 'stroke-opacity': 0.16, fill: 'none' }, s1);
+    var floor = el('g', { stroke: '#8ab4ff', 'stroke-opacity': 0.16, fill: 'none' }, s1);
     var horizon = 640;
     for (var i = -14; i <= 14; i++) {
       var x = NET_X + i * 240;
       el('line', { x1: NET_X + (x - NET_X) * 0.06, y1: horizon, x2: x, y2: VH + 20 }, floor);
     }
     for (var j = 0; j <= 9; j++) { var u = j / 9; var y = horizon + (VH - horizon) * u * u; el('line', { x1: 0, y1: y, x2: VW, y2: y, 'stroke-opacity': 0.08 + 0.12 * u }, floor); }
-    el('line', { x1: 0, y1: FLOOR, x2: VW, y2: FLOOR, stroke: '#ffb26b', 'stroke-opacity': 0.55, 'stroke-width': 2 }, s1);
-    el('line', { x1: 0, y1: 668, x2: VW, y2: 668, stroke: '#ffb26b', 'stroke-opacity': 0.25, 'stroke-width': 1.5 }, s1);
+    el('line', { x1: 0, y1: FLOOR, x2: VW, y2: FLOOR, stroke: '#b9c9ff', 'stroke-opacity': 0.55, 'stroke-width': 2 }, s1);
+    el('line', { x1: 0, y1: 668, x2: VW, y2: 668, stroke: '#b9c9ff', 'stroke-opacity': 0.25, 'stroke-width': 1.5 }, s1);
     [NET_X, NET_X - 525, NET_X + 525].forEach(function (cx, idx) {
-      el('line', { x1: cx, y1: FLOOR, x2: cx + 45, y2: 668, stroke: '#ffb26b', 'stroke-opacity': idx ? 0.3 : 0.5, 'stroke-width': idx ? 1.5 : 2 }, s1);
+      el('line', { x1: cx, y1: FLOOR, x2: cx + 45, y2: 668, stroke: '#b9c9ff', 'stroke-opacity': idx ? 0.3 : 0.5, 'stroke-width': idx ? 1.5 : 2 }, s1);
     });
     // net (three-quarter view: near post at NET_X, far post a little behind)
     var net = el('g', {}, s1);
@@ -321,7 +321,7 @@ window.Intro = (function () {
     dom.speedLines = el('g', { stroke: '#ffffff', 'stroke-width': 3, 'stroke-linecap': 'round', opacity: 0 }, s1);
     for (var sl = 0; sl < 5; sl++) el('line', {}, dom.speedLines);
     // dust at the plant
-    dom.dust = el('g', { fill: '#ffb26b', opacity: 0 }, s1);
+    dom.dust = el('g', { fill: '#b9c9ff', opacity: 0 }, s1);
     for (var dd = 0; dd < 4; dd++) el('circle', { r: 6 }, dom.dust);
     // figures
     dom.setter = makeFigure(s1, SETTER);
@@ -331,13 +331,13 @@ window.Intro = (function () {
     dom.ring = el('circle', { fill: 'none', stroke: '#ffffff', 'stroke-width': 4, opacity: 0 }, s1);
     var starPts = [];
     for (var k = 0; k < 16; k++) { var r = k % 2 ? 0.42 : 1, a = k * Math.PI / 8; starPts.push([Math.cos(a) * r, Math.sin(a) * r]); }
-    dom.starGlow = el('polygon', { points: pts(starPts), fill: '#ffb26b', filter: 'url(#in-blur)', opacity: 0 }, s1);
+    dom.starGlow = el('polygon', { points: pts(starPts), fill: '#b9c9ff', filter: 'url(#in-blur)', opacity: 0 }, s1);
     dom.star = el('polygon', { points: pts(starPts), fill: '#ffffff', opacity: 0 }, s1);
     el('rect', { width: VW, height: VH, fill: 'url(#in-vig)', 'pointer-events': 'none' }, s1);
 
     /* --- shot 2: ball cam --- */
     var s2 = dom.shot2 = el('g', { opacity: 0 }, svg);
-    el('rect', { width: VW, height: VH, fill: '#05070f' }, s2);
+    el('rect', { width: VW, height: VH, fill: '#0e1019' }, s2);
     dom.rays = el('g', { stroke: '#ffffff', 'stroke-linecap': 'round' }, s2);
     dom.rayData = [];
     for (var rr = 0; rr < 56; rr++) {

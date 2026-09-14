@@ -21,11 +21,13 @@
   var ARROW = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   /* ================= theme ================= */
-  function applyAccent() {
+  /** Accent colours from site.js: `accent`/`accent2` for the dark theme, `accentLight`/`accent2Light` for light. */
+  function applyAccent(name) {
     var t = SITE.theme || {};
     var root = document.documentElement.style;
-    if (t.accent) root.setProperty('--accent', t.accent);
-    if (t.accent2) root.setProperty('--accent-2', t.accent2);
+    var a = name === 'light' ? t.accentLight : t.accent, b = name === 'light' ? t.accent2Light : t.accent2;
+    if (a) root.setProperty('--accent', a); else root.removeProperty('--accent');
+    if (b) root.setProperty('--accent-2', b); else root.removeProperty('--accent-2');
   }
   function currentTheme() {
     return U.local.get('theme') || (SITE.theme && SITE.theme.default) || 'dark';
@@ -33,11 +35,11 @@
   function applyTheme(name) {
     document.documentElement.setAttribute('data-theme', name);
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', name === 'dark' ? '#070a14' : '#f4f5f9');
+    if (meta) meta.setAttribute('content', name === 'dark' ? '#12141f' : '#f4f6fb');
+    applyAccent(name);
     document.dispatchEvent(new CustomEvent('themechange', { detail: name }));
   }
   function initTheme() {
-    applyAccent();
     applyTheme(currentTheme());
     var btn = $('#theme-toggle');
     if (SITE.theme && SITE.theme.allowToggle === false) { btn.hidden = true; return; }
@@ -249,6 +251,7 @@
       '<h1 class="hero-title">' + big + '<span class="dot">.</span></h1>' +
       (SITE.tagline ? '<p class="hero-tagline">' + esc(SITE.tagline) + '</p>' : '') +
       (SITE.intro ? '<div class="subcopy prose">' + MD.render(SITE.intro) + '</div>' : '') +
+      '<p class="visitor-line" id="visitor-line" hidden></p>' +
       '<div class="hero-actions">' +
       '<a class="btn btn-primary" href="#/projects">' + esc(HOME.projectsLabel) + '<span class="arrow">→</span></a>' +
       '<a class="btn" href="#/blog">' + esc(HOME.blogLabel) + '<span class="arrow">→</span></a>' +
@@ -483,6 +486,7 @@
 
     main.innerHTML = html;
     currentView = view;
+    if (view === 'home' && window.Visitors) window.Visitors.mount($('#visitor-line'), SITE.visitorCounter);
     document.title = title;
     setActiveTab(tab);
     setRail(railOpts);
@@ -511,6 +515,7 @@
     initTheme();
     initChrome();
     initRail();
+    if (window.Music) window.Music.init(SITE.music);
     if (window.Background && SITE.background && SITE.background.enabled !== false) {
       window.Background.start($('#bg'), SITE.background);
     }

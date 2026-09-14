@@ -1,25 +1,33 @@
-/* 3D intro (Three.js, vendored in js/vendor/three.min.js). Same quick-attack choreography as the 2D
-   version in intro.js — setter receives a pass, the hitter is already in the air, a flat quick set,
-   a spike — but rendered as a lit low-poly scene with a moving camera. After contact the camera cuts to
-   the receiver's side of the net and the ball flies straight at it until it fills the screen and the
-   home page appears. Falls back to intro.js automatically when WebGL is not available.
-   Timing lives in T (seconds); colours in COL. */
+/* 3D intro (Three.js, vendored in js/vendor/three.min.js).
+   The open spike: a high toss, a full three-step approach, a huge jump, a slow-motion beat at the
+   top, the swing, then the receiver's view as the ball flies straight at the camera and fills the
+   screen before the home page appears. The hitter is styled after a short orange-haired #10 and
+   the setter after a dark-haired #9; both are original low-poly figures.
+   Timing lives in T (seconds), the real-time → scene-time map in TIME_MAP (slow motion, hit-stop),
+   colours in COL. Falls back to intro.js when WebGL is not available. */
 window.Intro3D = (function () {
   'use strict';
   var U = window.U;
   var T = {
-    fadeIn: 0.3, runStart: 0.35, runEnd: 1.30, plantEnd: 1.47, peak: 1.86,
-    passStart: 0.15, setStart: 1.50, contact: 1.85, hitStop: 0.12, cut: 2.02,
-    flight: 1.0,      // seconds for the ball to reach the camera after the cut
-    fadeAt: 0.86, fadeDur: 0.75, end: 3.8
+    fadeIn: 0.35,
+    passStart: 0.10, setContact: 1.30, setRelease: 1.42,     // the pass reaches the setter; the toss leaves
+    runStart: 1.80, plant: 2.66, takeoff: 2.68, peak: 3.08, contact: 3.10,
+    shotB: 1.80, shotC: 2.92,                                // real-time cuts
+    cut: 3.72,                                               // real-time cut to the receiver's view
+    flight: 1.05, fadeAt: 0.9, fadeDur: 0.75, end: 5.55
   };
+  // real seconds → scene seconds. Slope 1 = normal speed, 0.22 = slow motion, 0 = freeze frame.
+  var TIME_MAP = [[0, 0], [2.92, 2.92], [3.465, 3.04], [3.525, 3.10], [3.665, 3.10], [9.0, 8.435]];
   var COL = {
-    skin: 0xf3c9a1, hairHitter: 0xff7a1a, hairSetter: 0x1c2340, jersey: 0x171c30, stripe: 0xff7a1a, shorts: 0x10152a,
-    shoe: 0xe9ecf5, pad: 0xdfe3ee, ink: 0x141827, bg: 0x05070f, floor: '#0b1020', grid: 'rgba(255,122,26,0.16)', lines: 'rgba(255,178,107,0.85)'
+    skin: 0xf6d2b4, hairHitter: 0xf5822a, hairSetter: 0x171b2c, jersey: 0x1a1a21, kit: 0xf5822a, shorts: 0x15151b,
+    shoe: 0xf2f3f7, shoeStripe: 0xe0452b, sole: 0x2a2a30, pad: 0x1a1a21, ink: 0x141827,
+    irisHitter: 0x6b3d17, irisSetter: 0x223a6e, brow: 0xb85c14, browSetter: 0x1a1f33, mouth: 0x7a2a2a,
+    bg: 0x0e1019, floor: '#12141f', grid: 'rgba(138,180,255,0.17)', lines: 'rgba(185,201,255,0.85)', court: 'rgba(138,180,255,0.05)',
+    accent: 0x8ab4ff, accent2: 0xb9a6ff, dust: 0xc9d4ff
   };
-  var NET_TOP = 2.24, PEAK_HIP = 1.72;
+  var NET_TOP = 2.24, PEAK_HIP = 1.96;
   var rad = Math.PI / 180;
-  var S = { built: false, playing: false, seeking: false, raf: 0, start: 0, done: null, fading: false, lastBeat: -1, contactPt: null, handsPt: null, w: 0, h: 0 };
+  var S = { built: false, playing: false, seeking: false, raf: 0, start: 0, done: null, fading: false, lastBeat: -1, contactPt: null, handsPass: null, handsRelease: null, w: 0, h: 0 };
   var dom = {}, G = {};
 
   function supported() {
@@ -27,7 +35,7 @@ window.Intro3D = (function () {
     try { var c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch (e) { return false; }
   }
 
-  /* ---------- tween helpers (same as intro.js) ---------- */
+  /* ---------- tween helpers ---------- */
   function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
   var EASE = {
     lin: function (u) { return u; }, inQ: function (u) { return u * u; }, outQ: function (u) { return 1 - (1 - u) * (1 - u); },
@@ -42,7 +50,7 @@ window.Intro3D = (function () {
   }
   function blend(a, b, u) {
     var o = {};
-    for (var k in a) o[k] = typeof a[k] === 'number' && typeof b[k] === 'number' ? a[k] + (b[k] - a[k]) * u : (u < 0.5 ? a[k] : b[k]);
+    for (var k in a) o[k] = (typeof a[k] === 'number' && typeof b[k] === 'number') ? a[k] + (b[k] - a[k]) * u : (b[k] === undefined ? a[k] : (u < 0.5 ? a[k] : b[k]));
     for (var k2 in b) if (!(k2 in o)) o[k2] = b[k2];
     return o;
   }
@@ -52,10 +60,11 @@ window.Intro3D = (function () {
     return keys[keys.length - 1].p;
   }
   function v3(x, y, z) { return new THREE.Vector3(x, y, z); }
+  function sceneTime(t) { return track(t, TIME_MAP); }
 
   /* ---------- rig ---------- */
-  var HITTER = { number: '10', hair: 'spiky', hairColor: COL.hairHitter, scale: 1.0, torso: 0.40, neck: 0.05, head: 0.13, upper: 0.27, fore: 0.25, thigh: 0.35, shin: 0.33 };
-  var SETTER = { number: '9', hair: 'cap', hairColor: COL.hairSetter, scale: 1.1, torso: 0.42, neck: 0.05, head: 0.13, upper: 0.28, fore: 0.26, thigh: 0.36, shin: 0.34 };
+  var HITTER = { number: '10', hair: 'spiky', hairColor: COL.hairHitter, iris: COL.irisHitter, brow: COL.brow, scale: 1.0, torso: 0.40, neck: 0.05, head: 0.135, upper: 0.27, fore: 0.25, thigh: 0.35, shin: 0.33 };
+  var SETTER = { number: '9', hair: 'cap', hairColor: COL.hairSetter, iris: COL.irisSetter, brow: COL.browSetter, scale: 1.1, torso: 0.42, neck: 0.05, head: 0.13, upper: 0.28, fore: 0.26, thigh: 0.36, shin: 0.34 };
 
   function mat(color, opts) { return new THREE.MeshStandardMaterial(Object.assign({ color: color, roughness: 0.78, metalness: 0 }, opts || {})); }
   function capsule(r, len, material) { var m = new THREE.Mesh(new THREE.CapsuleGeometry(r, Math.max(0.01, len), 4, 12), material); m.castShadow = true; return m; }
@@ -64,48 +73,72 @@ window.Intro3D = (function () {
     var m = capsule(r, len - r * 1.2, material); m.position.y = -len / 2; g.add(m);
     return g;
   }
-  function textTexture(text, size, color, font) {
+  function numberTexture(text) {
     var c = document.createElement('canvas'); c.width = c.height = 128;
     var x = c.getContext('2d'); x.clearRect(0, 0, 128, 128);
-    x.fillStyle = color; x.font = font || ('700 ' + size + 'px "Space Grotesk", system-ui, sans-serif');
-    x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 64, 68);
+    x.font = '700 82px "Space Grotesk", system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.lineWidth = 10; x.strokeStyle = '#f5822a'; x.lineJoin = 'round'; x.strokeText(text, 64, 68);
+    x.fillStyle = '#ffffff'; x.fillText(text, 64, 68);
     var t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   }
+  var HAIR_SPIKES = [ // direction (x forward, y up, z side), length
+    [0.35, 1, 0.05, 0.19], [0.05, 1, 0.5, 0.2], [0.05, 1, -0.5, 0.2], [-0.4, 0.95, 0.15, 0.21], [-0.4, 0.95, -0.15, 0.21],
+    [0.6, 0.8, 0.4, 0.17], [0.6, 0.8, -0.4, 0.17], [-0.75, 0.65, 0.5, 0.19], [-0.75, 0.65, -0.5, 0.19], [-0.95, 0.35, 0, 0.2],
+    [-0.6, 0.5, 0.8, 0.16], [-0.6, 0.5, -0.8, 0.16], [0.2, 0.7, 0.85, 0.15], [0.2, 0.7, -0.85, 0.15], [-0.15, 1, 0, 0.23],
+    [0.85, 0.35, 0.25, 0.15], [0.85, 0.35, -0.25, 0.15], [0.7, 0.2, 0.7, 0.13], [0.7, 0.2, -0.7, 0.13], [-0.35, 0.85, 0.55, 0.18], [-0.35, 0.85, -0.55, 0.18]
+  ];
   function makeFigure(cfg) {
-    var skin = mat(COL.skin), jersey = mat(COL.jersey), shorts = mat(COL.shorts), shoe = mat(COL.shoe), pad = mat(COL.pad, { roughness: 0.5 }), stripe = mat(COL.stripe), hair = mat(cfg.hairColor), ink = mat(COL.ink);
+    var skin = mat(COL.skin), jersey = mat(COL.jersey, { roughness: 0.85 }), kit = mat(COL.kit), shorts = mat(COL.shorts, { roughness: 0.85 });
+    var shoe = mat(COL.shoe, { roughness: 0.5 }), sole = mat(COL.sole), stripe = mat(COL.shoeStripe), pad = mat(COL.pad, { roughness: 0.9 }), hair = mat(cfg.hairColor, { roughness: 0.7 });
+    var ink = mat(COL.ink), white = mat(0xffffff, { roughness: 0.3 }), iris = mat(cfg.iris, { roughness: 0.4 }), brow = mat(cfg.brow), mouth = mat(COL.mouth);
     var root = new THREE.Group(); root.scale.setScalar(cfg.scale);
     var torso = new THREE.Group(); root.add(torso);
     var body = capsule(0.15, cfg.torso - 0.2, jersey); body.position.y = cfg.torso * 0.52; body.scale.set(0.78, 1, 1.12); torso.add(body);
-    [1, -1].forEach(function (s) {
-      var b = new THREE.Mesh(new THREE.BoxGeometry(0.05, cfg.torso * 0.72, 0.02), stripe); b.position.set(0.03, cfg.torso * 0.5, s * 0.172); b.castShadow = true; torso.add(b);
+    [1, -1].forEach(function (s) { // orange side panels
+      var b = new THREE.Mesh(new THREE.BoxGeometry(0.07, cfg.torso * 0.78, 0.03), kit); b.position.set(0.02, cfg.torso * 0.48, s * 0.17); b.castShadow = true; torso.add(b);
+      var sl = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.07, 0.1, 12), jersey); sl.rotation.x = Math.PI / 2; sl.position.set(0, cfg.torso - 0.03, s * 0.2); sl.castShadow = true; torso.add(sl);
+      var band = new THREE.Mesh(new THREE.CylinderGeometry(0.072, 0.072, 0.025, 12), kit); band.rotation.x = Math.PI / 2; band.position.set(0, cfg.torso - 0.03, s * 0.245); torso.add(band);
     });
-    var numMat = new THREE.MeshBasicMaterial({ map: textTexture(cfg.number, 86, '#ffffff'), transparent: true, depthWrite: false });
+    var numMat = new THREE.MeshBasicMaterial({ map: numberTexture(cfg.number), transparent: true, depthWrite: false });
     var nf = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), numMat); nf.position.set(0.122, cfg.torso * 0.62, 0); nf.rotation.y = Math.PI / 2; torso.add(nf);
-    var nb = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), numMat); nb.position.set(-0.122, cfg.torso * 0.62, 0); nb.rotation.y = -Math.PI / 2; torso.add(nb);
+    var nb = new THREE.Mesh(new THREE.PlaneGeometry(0.19, 0.19), numMat); nb.position.set(-0.122, cfg.torso * 0.6, 0); nb.rotation.y = -Math.PI / 2; torso.add(nb);
     var sh = capsule(0.16, 0.06, shorts); sh.position.y = -0.03; sh.scale.set(0.85, 1, 1.1); root.add(sh);
+    [1, -1].forEach(function (s) { var st = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.14, 0.025), kit); st.position.set(0.02, -0.04, s * 0.175); root.add(st); });
     // head
     var neck = new THREE.Group(); neck.position.y = cfg.torso + cfg.neck; torso.add(neck);
-    var head = new THREE.Mesh(new THREE.SphereGeometry(cfg.head, 24, 18), skin); head.position.y = cfg.head * 0.92; head.castShadow = true; neck.add(head);
-    [1, -1].forEach(function (s) { var e = new THREE.Mesh(new THREE.SphereGeometry(0.016, 10, 8), ink); e.position.set(cfg.head * 0.9, 0.012, s * 0.05); head.add(e); });
+    var head = new THREE.Mesh(new THREE.SphereGeometry(cfg.head, 26, 20), skin); head.position.y = cfg.head * 0.92; head.castShadow = true; neck.add(head);
+    var R = cfg.head;
+    [1, -1].forEach(function (s) {
+      var sc = new THREE.Mesh(new THREE.SphereGeometry(0.034, 14, 12), white); sc.scale.set(0.3, 1.05, 0.85); sc.position.set(R * 0.86, 0.012, s * R * 0.4); head.add(sc);
+      var ir = new THREE.Mesh(new THREE.SphereGeometry(0.021, 12, 10), iris); ir.scale.set(0.3, 1, 0.85); ir.position.set(R * 0.93, 0.008, s * R * 0.4); head.add(ir);
+      var pu = new THREE.Mesh(new THREE.SphereGeometry(0.01, 8, 8), ink); pu.scale.set(0.3, 1, 0.9); pu.position.set(R * 0.98, 0.01, s * R * 0.4); head.add(pu);
+      var hl = new THREE.Mesh(new THREE.SphereGeometry(0.005, 6, 6), white); hl.position.set(R * 1.0, 0.024, s * R * 0.45); head.add(hl);
+      var br = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.009, 0.055), brow); br.position.set(R * 0.9, 0.056, s * R * 0.4); br.rotation.x = s * (cfg.hair === 'spiky' ? 0.35 : -0.3); head.add(br);
+    });
+    var mo = new THREE.Mesh(new THREE.SphereGeometry(cfg.hair === 'spiky' ? 0.017 : 0.012, 10, 8), mouth); mo.scale.set(0.35, 1, 1.1); mo.position.set(R * 0.92, -0.058, 0); head.add(mo);
     if (cfg.hair === 'spiky') {
-      var dirs = [[0.25, 1, 0], [0.55, 0.85, 0.35], [0.55, 0.85, -0.35], [0, 0.95, 0.55], [0, 0.95, -0.55], [-0.4, 0.9, 0.2], [-0.4, 0.9, -0.2], [-0.8, 0.55, 0.45], [-0.8, 0.55, -0.45], [-0.95, 0.2, 0], [0.75, 0.55, 0], [-0.55, 0.75, 0.6], [-0.55, 0.75, -0.6]];
-      dirs.forEach(function (d, i) {
+      var base = new THREE.Mesh(new THREE.SphereGeometry(R * 1.06, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.58), hair); base.position.set(-0.012, 0.012, 0); base.rotation.z = 0.15; base.castShadow = true; head.add(base);
+      HAIR_SPIKES.forEach(function (d) {
         var dir = v3(d[0], d[1], d[2]).normalize();
         var g = new THREE.Group(); g.quaternion.setFromUnitVectors(v3(0, 1, 0), dir); head.add(g);
-        var h = 0.15 + (i % 3) * 0.03;
-        var cone = new THREE.Mesh(new THREE.ConeGeometry(0.045, h, 8), hair); cone.position.y = cfg.head * 0.75 + h / 2; cone.castShadow = true; g.add(cone);
+        var cone = new THREE.Mesh(new THREE.ConeGeometry(0.042, d[3], 7), hair); cone.position.y = R * 0.7 + d[3] / 2; cone.castShadow = true; g.add(cone);
       });
-      var base = new THREE.Mesh(new THREE.SphereGeometry(cfg.head * 1.04, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), hair); base.position.y = 0.01; head.add(base);
+      [[0.75, -0.55, 0.3, 0.13], [0.8, -0.45, -0.2, 0.13], [0.7, -0.6, 0.02, 0.12], [0.65, -0.5, 0.55, 0.11]].forEach(function (d) { // fringe over the forehead
+        var dir = v3(d[0], d[1], d[2]).normalize();
+        var g = new THREE.Group(); g.quaternion.setFromUnitVectors(v3(0, 1, 0), dir); g.position.set(0.02, R * 0.72, 0); head.add(g);
+        var cone = new THREE.Mesh(new THREE.ConeGeometry(0.03, d[3], 7), hair); cone.position.y = d[3] / 2 - 0.02; g.add(cone);
+      });
     } else {
-      var cap = new THREE.Mesh(new THREE.SphereGeometry(cfg.head * 1.09, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.56), hair);
-      cap.position.set(-0.012, 0.012, 0); cap.rotation.z = 0.28; cap.castShadow = true; head.add(cap);
+      var cap = new THREE.Mesh(new THREE.SphereGeometry(R * 1.1, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.6), hair);
+      cap.position.set(-0.012, 0.014, 0); cap.rotation.z = 0.22; cap.castShadow = true; head.add(cap);
+      var fringe = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.19), hair); fringe.position.set(R * 0.9, R * 0.62, 0); fringe.rotation.z = -0.3; head.add(fringe);
       [[0.5, 0.35, 0.25], [0.55, 0.3, -0.2], [0.45, 0.45, 0.02]].forEach(function (d) {
         var dir = v3(d[0], -d[1], d[2]).normalize();
         var g = new THREE.Group(); g.quaternion.setFromUnitVectors(v3(0, 1, 0), dir); g.position.set(0.06, 0.09, 0); head.add(g);
-        var cone = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 8), hair); cone.position.y = 0.05; g.add(cone);
+        var cone = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.12, 8), hair); cone.position.y = 0.05; g.add(cone);
       });
     }
-    // arms (front = +Z, the side nearest the camera = the hitting arm)
+    // arms (+Z = the side nearest the camera = the hitting arm)
     var shoulderY = cfg.torso - 0.02;
     var armF = limb(torso, 0.05, cfg.upper, skin, v3(0, shoulderY, 0.19));
     var foreF = limb(armF, 0.045, cfg.fore, skin, v3(0, -cfg.upper, 0));
@@ -113,12 +146,13 @@ window.Intro3D = (function () {
     var armB = limb(torso, 0.05, cfg.upper, skin, v3(0, shoulderY, -0.19));
     var foreB = limb(armB, 0.045, cfg.fore, skin, v3(0, -cfg.upper, 0));
     var handB = new THREE.Mesh(new THREE.SphereGeometry(0.055, 14, 12), skin); handB.position.y = -cfg.fore; handB.castShadow = true; foreB.add(handB);
-    // legs
     function leg(z) {
       var thigh = limb(root, 0.07, cfg.thigh, skin, v3(0, 0, z));
       var shin = limb(thigh, 0.06, cfg.shin, skin, v3(0, -cfg.thigh, 0));
-      var knee = new THREE.Mesh(new THREE.SphereGeometry(0.076, 14, 12), pad); knee.position.set(0.01, 0, 0); knee.castShadow = true; shin.add(knee);
-      var foot = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.08, 0.11), shoe); foot.position.set(0.06, -cfg.shin - 0.02, 0); foot.castShadow = true; shin.add(foot);
+      var knee = new THREE.Mesh(new THREE.SphereGeometry(0.078, 14, 12), pad); knee.position.set(0.01, -0.01, 0); knee.scale.set(1, 1.25, 1); knee.castShadow = true; shin.add(knee);
+      var foot = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.075, 0.11), shoe); foot.position.set(0.06, -cfg.shin - 0.02, 0); foot.castShadow = true; shin.add(foot);
+      var fs = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.115), stripe); fs.position.set(0.05, -cfg.shin - 0.015, 0); shin.add(fs);
+      var so = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.02, 0.115), sole); so.position.set(0.06, -cfg.shin - 0.06, 0); shin.add(so);
       return { thigh: thigh, shin: shin };
     }
     var lf = leg(0.085), lb = leg(-0.085);
@@ -133,7 +167,7 @@ window.Intro3D = (function () {
     f.root.position.set(p.x, p.y, p.z || 0);
     f.root.rotation.y = (p.yaw || 0) * rad;
     f.torso.rotation.set(0, (p.twist || 0) * rad, -p.lean * rad);
-    f.neck.rotation.z = -p.tilt * rad;
+    f.neck.rotation.set(0, (p.look || 0) * rad, -p.tilt * rad);
     f.armF.rotation.set((p.abd1 || 0) * rad, 0, (p.ua1 + p.lean) * rad);
     f.foreF.rotation.z = (p.fa1 - p.ua1) * rad;
     f.armB.rotation.set(-(p.abd2 || 0) * rad, 0, (p.ua2 + p.lean) * rad);
@@ -142,96 +176,116 @@ window.Intro3D = (function () {
     f.legB.rotation.z = p.th2 * rad; f.shinB.rotation.z = (p.sh2 - p.th2) * rad;
   }
 
-  /* ---------- choreography (angles shared with intro.js; positions in metres, net at x = 0) ---------- */
+  /* ---------- choreography (metres; net at x = 0, the hitter's court is x < 0, the camera side is +z) ---------- */
+  var PATH0 = { x: -4.0, z: 5.0 }, PATH_LEN = 3.2;
+  var PD = { x: 0.891, z: -0.453 };           // approach direction (unit)
+  var PN = { x: 0.453, z: 0.891 };            // perpendicular, toward the camera side
+  var YAW = 26.9;                             // facing along the path
+  function onPath(s) { return { x: PATH0.x + PD.x * s, z: PATH0.z + PD.z * s }; }
+  function hitterDist(ts) {
+    return track(ts, [[T.runStart, 0, 'lin'], [2.10, 0.45, 'inQ'], [2.32, 1.30, 'lin'], [2.50, 2.35, 'lin'], [T.plant, PATH_LEN, 'outQ'], [T.contact, PATH_LEN + 0.36, 'lin'], [3.8, PATH_LEN + 0.78, 'lin']]);
+  }
+  var READY = { lean: 10, tilt: -26, look: -8, twist: 0, ua1: 35, fa1: 75, ua2: 35, fa2: 75, abd1: 10, abd2: 10, th1: 18, sh1: -6, th2: -8, sh2: -10 };
   function runPose(ts) {
-    var x = track(ts, [[T.runStart, -4.3, 'lin'], [T.runEnd, -1.08, 'inQ']]);
-    var ph = (x + 4.3) / 0.55 * Math.PI * 2;
+    var s = hitterDist(ts);
+    var ph = s / 1.0 * Math.PI * 2;
     var sw = Math.sin(ph);
-    var th1 = 36 * sw, th2 = -36 * sw;
-    var sh1 = th1 - 22 - 36 * (1 - sw) / 2, sh2 = th2 - 22 - 36 * (1 + sw) / 2;
-    var speed = seg(ts, T.runStart, T.runStart + 0.25, 'outQ');
-    return {
-      x: x, lean: 6 + 12 * speed, tilt: -2, twist: 0,
-      ua1: 25 - 50 * sw * speed, fa1: 95 - 50 * sw * speed, ua2: 25 + 50 * sw * speed, fa2: 95 + 50 * sw * speed, abd1: 8, abd2: 8,
+    var th1 = 38 * sw, th2 = -38 * sw;
+    var sh1 = th1 - 22 - 38 * (1 - sw) / 2, sh2 = th2 - 22 - 38 * (1 + sw) / 2;
+    var speed = seg(ts, T.runStart, T.runStart + 0.3, 'outQ');
+    var back = seg(s, 2.15, 3.05, 'inOutQ');       // final stride: both arms swing back together
+    var p = {
+      lean: 8 + 12 * speed + 10 * back, tilt: -18 - 6 * back, look: 0, twist: 0,
+      ua1: (28 - 55 * sw * speed) * (1 - back) + (-78) * back, fa1: (95 - 55 * sw * speed) * (1 - back) + (-62) * back,
+      ua2: (28 + 55 * sw * speed) * (1 - back) + (-74) * back, fa2: (95 + 55 * sw * speed) * (1 - back) + (-60) * back,
+      abd1: 10 + 6 * back, abd2: 10 + 6 * back,
       th1: th1 * (0.3 + 0.7 * speed), sh1: sh1 * (0.3 + 0.7 * speed) - 4, th2: th2 * (0.3 + 0.7 * speed), sh2: sh2 * (0.3 + 0.7 * speed) - 4
     };
+    return blend(READY, p, seg(ts, T.runStart, T.runStart + 0.22, 'inOutQ'));
   }
   var hitterKeys = null;
   function hitterPose(ts) {
-    var p;
-    if (ts < T.runEnd) { p = runPose(ts); p.y = groundY(HITTER, p); return p; }
+    var p, pos = onPath(hitterDist(ts));
+    if (ts < T.plant) {
+      p = ts < T.runStart ? blend(READY, { lean: READY.lean + 1, tilt: READY.tilt }, 0.5 + 0.5 * Math.sin(ts * 3)) : runPose(ts);
+      p.x = pos.x; p.z = pos.z; p.y = groundY(HITTER, p); p.yaw = YAW; return p;
+    }
     if (!hitterKeys) {
+      var plant = { lean: 28, tilt: -20, look: -6, twist: 0, ua1: -80, fa1: -64, ua2: -76, fa2: -62, abd1: 14, abd2: 14, th1: 46, sh1: -32, th2: 40, sh2: -38 };
       hitterKeys = [
-        { t: T.runEnd, p: runPose(T.runEnd) },
-        { t: T.plantEnd, p: { lean: 30, tilt: -8, twist: 0, ua1: -60, fa1: -48, ua2: -55, fa2: -42, abd1: 12, abd2: 12, th1: 44, sh1: -30, th2: 36, sh2: -36 }, e: 'inOutQ' },
-        { t: 1.60, p: { lean: 8, tilt: -12, twist: 0, ua1: 150, fa1: 168, ua2: 140, fa2: 158, abd1: 14, abd2: 14, th1: -14, sh1: -10, th2: -18, sh2: -22 }, e: 'outQ' },
-        { t: 1.74, p: { lean: -12, tilt: -18, twist: -22, ua1: 200, fa1: 292, ua2: 165, fa2: 150, abd1: 48, abd2: 20, th1: -26, sh1: -72, th2: -20, sh2: -78 }, e: 'inOutQ' },
-        { t: T.contact, p: { lean: 12, tilt: -8, twist: 14, ua1: 127, fa1: 127, ua2: 52, fa2: 36, abd1: 10, abd2: 14, th1: 24, sh1: -18, th2: 12, sh2: -32 }, e: 'inC' },
-        { t: 2.10, p: { lean: 26, tilt: 6, twist: 20, ua1: 52, fa1: 30, ua2: 40, fa2: 28, abd1: 14, abd2: 14, th1: 32, sh1: -10, th2: 20, sh2: -22 }, e: 'outQ' },
-        { t: 2.45, p: { lean: 14, tilt: 2, twist: 8, ua1: 30, fa1: 60, ua2: 25, fa2: 55, abd1: 10, abd2: 10, th1: 26, sh1: -30, th2: 20, sh2: -34 }, e: 'inOutQ' }
+        { t: T.plant, p: plant },
+        { t: 2.84, p: { lean: 4, tilt: -22, look: -6, twist: -4, ua1: 140, fa1: 165, ua2: 135, fa2: 160, abd1: 16, abd2: 16, th1: -12, sh1: -8, th2: -16, sh2: -18 }, e: 'outQ' },
+        { t: 2.96, p: { lean: -8, tilt: -24, look: -4, twist: -14, ua1: 178, fa1: 205, ua2: 165, fa2: 185, abd1: 28, abd2: 22, th1: -18, sh1: -45, th2: -14, sh2: -50 }, e: 'inOutQ' },
+        { t: 3.04, p: { lean: -18, tilt: -22, look: 0, twist: -30, ua1: 205, fa1: 300, ua2: 150, fa2: 130, abd1: 55, abd2: 18, th1: -30, sh1: -75, th2: -24, sh2: -80 }, e: 'inOutQ' },
+        { t: T.contact, p: { lean: 16, tilt: -4, look: 4, twist: 18, ua1: 128, fa1: 128, ua2: 48, fa2: 30, abd1: 6, abd2: 12, th1: 28, sh1: -22, th2: 16, sh2: -34 }, e: 'inC' },
+        { t: 3.34, p: { lean: 34, tilt: 10, look: 6, twist: 26, ua1: 30, fa1: 10, ua2: 30, fa2: 25, abd1: 10, abd2: 10, th1: 36, sh1: -14, th2: 26, sh2: -24 }, e: 'outQ' },
+        { t: 3.7, p: { lean: 16, tilt: 0, look: 4, twist: 8, ua1: 25, fa1: 55, ua2: 25, fa2: 55, abd1: 10, abd2: 10, th1: 30, sh1: -28, th2: 24, sh2: -30 }, e: 'inOutQ' }
       ];
     }
     p = poseTrack(ts, hitterKeys);
-    p.x = track(ts, [[T.runEnd, -1.08, 'lin'], [T.plantEnd, -1.0, 'outQ'], [T.peak, -0.84, 'lin'], [2.6, -0.62, 'lin']]);
-    if (ts < T.plantEnd) p.y = groundY(HITTER, p);
+    p.x = pos.x; p.z = pos.z;
+    p.yaw = track(ts, [[T.takeoff, YAW, 'lin'], [T.contact, 12, 'inOutQ'], [3.5, 6, 'lin']]);
+    var y0 = groundY(HITTER, hitterKeys[0].p);
+    if (ts < T.takeoff) p.y = y0;
     else {
-      var y0 = groundY(HITTER, hitterKeys[1].p);
-      var u = (ts - T.plantEnd) / (T.peak - T.plantEnd);
+      var u = (ts - T.takeoff) / (T.peak - T.takeoff);
       if (u <= 1) p.y = y0 + (PEAK_HIP - y0) * (1 - (1 - u) * (1 - u));
       else { var d = u - 1; p.y = Math.max(y0 + 0.02, PEAK_HIP - (PEAK_HIP - y0) * d * d); }
     }
     return p;
   }
   var setterKeys = [
-    { t: 0, p: { lean: 4, tilt: -6, ua1: 150, fa1: 206, ua2: 148, fa2: 208, abd1: 22, abd2: 22, th1: 8, sh1: 4, th2: -8, sh2: -6, jump: 0 } },
-    { t: 1.20, p: { lean: 4, tilt: -6, ua1: 150, fa1: 206, ua2: 148, fa2: 208, abd1: 22, abd2: 22, th1: 8, sh1: 4, th2: -8, sh2: -6, jump: 0 }, e: 'lin' },
-    { t: 1.42, p: { lean: 7, tilt: -16, ua1: 147, fa1: 210, ua2: 145, fa2: 212, abd1: 22, abd2: 22, th1: 24, sh1: -10, th2: 8, sh2: -14, jump: 0 }, e: 'inOutQ' },
-    { t: T.setStart, p: { lean: 2, tilt: -14, ua1: 150, fa1: 206, ua2: 148, fa2: 208, abd1: 22, abd2: 22, th1: 4, sh1: 2, th2: -4, sh2: -2, jump: 0.14 }, e: 'outQ' },
-    { t: 1.62, p: { lean: 0, tilt: -16, ua1: 170, fa1: 180, ua2: 168, fa2: 178, abd1: 18, abd2: 18, th1: 2, sh1: 0, th2: -2, sh2: 0, jump: 0.2 }, e: 'outQ' },
-    { t: 1.80, p: { lean: 4, tilt: -12, ua1: 160, fa1: 168, ua2: 158, fa2: 165, abd1: 18, abd2: 18, th1: 16, sh1: -6, th2: -6, sh2: -8, jump: 0 }, e: 'inQ' },
-    { t: 2.10, p: { lean: 4, tilt: -10, ua1: 118, fa1: 132, ua2: 116, fa2: 130, abd1: 14, abd2: 14, th1: 8, sh1: 4, th2: -8, sh2: -6, jump: 0 }, e: 'outQ' }
+    { t: 0, p: { lean: 6, tilt: -22, look: 0, twist: 0, ua1: 60, fa1: 120, ua2: 60, fa2: 120, abd1: 18, abd2: 18, th1: 14, sh1: -4, th2: -6, sh2: -8, jump: 0 } },
+    { t: 0.95, p: { lean: 6, tilt: -22, look: 0, twist: 0, ua1: 60, fa1: 120, ua2: 60, fa2: 120, abd1: 18, abd2: 18, th1: 14, sh1: -4, th2: -6, sh2: -8, jump: 0 }, e: 'lin' },
+    { t: 1.10, p: { lean: 8, tilt: -20, look: 0, twist: 0, ua1: 125, fa1: 195, ua2: 122, fa2: 197, abd1: 22, abd2: 22, th1: 26, sh1: -12, th2: 10, sh2: -16, jump: 0 }, e: 'inOutQ' },
+    { t: T.setContact, p: { lean: 2, tilt: -16, look: 0, twist: 0, ua1: 150, fa1: 206, ua2: 148, fa2: 208, abd1: 22, abd2: 22, th1: 6, sh1: 2, th2: -4, sh2: -2, jump: 0.16 }, e: 'outQ' },
+    { t: 1.46, p: { lean: -2, tilt: -18, look: 0, twist: 0, ua1: 176, fa1: 186, ua2: 174, fa2: 184, abd1: 18, abd2: 18, th1: 2, sh1: 0, th2: -2, sh2: 0, jump: 0.24 }, e: 'outQ' },
+    { t: 1.64, p: { lean: 4, tilt: -14, look: 0, twist: 0, ua1: 150, fa1: 160, ua2: 148, fa2: 158, abd1: 18, abd2: 18, th1: 16, sh1: -6, th2: -6, sh2: -8, jump: 0 }, e: 'inQ' },
+    { t: 2.2, p: { lean: 4, tilt: -18, look: 10, twist: 8, ua1: 40, fa1: 70, ua2: 38, fa2: 68, abd1: 14, abd2: 14, th1: 8, sh1: 4, th2: -8, sh2: -6, jump: 0 }, e: 'outQ' },
+    { t: 3.15, p: { lean: 4, tilt: -18, look: 12, twist: 8, ua1: 40, fa1: 70, ua2: 38, fa2: 68, abd1: 14, abd2: 14, th1: 8, sh1: 4, th2: -8, sh2: -6, jump: 0 }, e: 'lin' },
+    { t: 3.5, p: { lean: 2, tilt: -8, look: 12, twist: 6, ua1: 175, fa1: 205, ua2: 45, fa2: 75, abd1: 30, abd2: 14, th1: 8, sh1: 4, th2: -8, sh2: -6, jump: 0 }, e: 'outQ' }
   ];
   function setterPose(ts) {
     var p = poseTrack(ts, setterKeys);
-    p.x = track(ts, [[1.15, -2.12, 'lin'], [1.5, -2.0, 'inOutQ']]);
-    p.z = 0.05; p.yaw = -14; // turned a touch toward the camera
-    p.y = groundY(SETTER, p) + (p.jump || 0) + (ts < 1.2 ? 0.012 * Math.sin(ts * 4) : 0);
+    p.x = -1.05; p.z = 0.2; p.yaw = -64;
+    p.y = groundY(SETTER, p) + (p.jump || 0) + (ts < 1.0 ? 0.012 * Math.sin(ts * 4) : 0);
     return p;
   }
   function worldOf(obj, out) { G.scene.updateMatrixWorld(true); return obj.getWorldPosition(out || new THREE.Vector3()); }
   function setterHands(ts) {
     applyPose(G.setter, setterPose(ts));
     var a = worldOf(G.setter.handF), b = worldOf(G.setter.handB);
-    return a.add(b).multiplyScalar(0.5).add(v3(0.02, 0.13, 0));
+    return a.add(b).multiplyScalar(0.5).add(v3(0.01, 0.13, 0.03));
   }
   function hitterHand(ts) {
-    applyPose(G.hitter, hitterPose(ts));
-    return worldOf(G.hitter.handF).add(v3(0.06, 0.08, 0.02));
+    var p = hitterPose(ts); applyPose(G.hitter, p);
+    var h = worldOf(G.hitter.handF);
+    var yaw = p.yaw * rad; // a little in front of the palm, along the facing direction
+    return h.add(v3(Math.cos(yaw) * 0.07, 0.08, -Math.sin(yaw) * 0.07 + 0.02));
   }
-  function bez(p0, p1, p2, u) {
-    var a = p0.clone().lerp(p1, u), b = p1.clone().lerp(p2, u); return a.lerp(b, u);
-  }
+  function bez(p0, p1, p2, u) { var a = p0.clone().lerp(p1, u), b = p1.clone().lerp(p2, u); return a.lerp(b, u); }
   function ballState(ts) {
     var C = T.contact;
     if (ts < T.passStart) return { pos: v3(-9, -1, 0), vis: false };
-    if (ts < T.setStart) {
-      var p2 = S.handsPt, p0 = v3(-7.5, 2.0, 1.4), p1 = v3(p2.x * 0.5 - 2.4, 4.6, 0.7);
-      return { pos: bez(p0, p1, p2, seg(ts, T.passStart, T.setStart, 'lin')), vis: true };
+    if (ts < T.setContact) {
+      var p2 = S.handsPass, p0 = v3(-3.6, 1.4, -2.9), p1 = v3((p0.x + p2.x) / 2 - 0.3, 4.6, (p0.z + p2.z) / 2);
+      return { pos: bez(p0, p1, p2, seg(ts, T.passStart, T.setContact, 'lin')), vis: true };
     }
+    if (ts < T.setRelease) return { pos: S.handsPass.clone().lerp(S.handsRelease, seg(ts, T.setContact, T.setRelease, 'outQ')), vis: true };
     if (ts <= C) {
-      var a = S.handsPt, b = S.contactPt;
-      var ctrl = a.clone().lerp(b, 0.5); ctrl.y = Math.max(a.y, b.y) + 0.28;
-      return { pos: bez(a, ctrl, b, seg(ts, T.setStart, C, 'outQ')), vis: true };
+      var a = S.handsRelease, b = S.contactPt;
+      var ctrl = a.clone().lerp(b, 0.5); ctrl.y = (4 * 4.35 - a.y - b.y) / 2;
+      return { pos: bez(a, ctrl, b, seg(ts, T.setRelease, C, 'lin')), vis: true };
     }
     return { pos: S.contactPt.clone(), vis: true };
   }
 
   /* ---------- textures ---------- */
   function floorTexture() {
-    var size = 1024, m = size / 20; // 20 m x 20 m
+    var size = 1024, m = size / 20;
     var c = document.createElement('canvas'); c.width = c.height = size; var x = c.getContext('2d');
     x.fillStyle = COL.floor; x.fillRect(0, 0, size, size);
-    x.fillStyle = 'rgba(255,122,26,0.045)'; x.fillRect(size / 2 - 9 * m, size / 2 - 4.5 * m, 18 * m, 9 * m);
+    x.fillStyle = COL.court; x.fillRect(size / 2 - 9 * m, size / 2 - 4.5 * m, 18 * m, 9 * m);
     x.strokeStyle = COL.grid; x.lineWidth = 1; x.beginPath();
     for (var i = 0; i <= 20; i++) { x.moveTo(i * m, 0); x.lineTo(i * m, size); x.moveTo(0, i * m); x.lineTo(size, i * m); }
     x.stroke();
@@ -248,11 +302,10 @@ window.Intro3D = (function () {
     x.fillStyle = '#f7f2e8'; x.fillRect(0, 0, W, H);
     function band(u0, phi, color, width) {
       x.strokeStyle = color; x.lineWidth = width; x.lineJoin = 'round';
-      for (var pass = -1; pass <= 1; pass++) { // repeat so the seam wraps
+      for (var pass = -1; pass <= 1; pass++) {
         x.beginPath();
         for (var i = 0; i <= 200; i++) {
-          var u = i / 200 * Math.PI * 2;
-          var v = Math.atan(Math.tan(phi) * Math.sin(u - u0));
+          var u = i / 200 * Math.PI * 2, v = Math.atan(Math.tan(phi) * Math.sin(u - u0));
           var px = (u / (Math.PI * 2) + pass) * W, py = (0.5 - v / Math.PI) * H;
           if (i === 0) x.moveTo(px, py); else x.lineTo(px, py);
         }
@@ -277,7 +330,7 @@ window.Intro3D = (function () {
   }
   function starTexture() {
     var c = document.createElement('canvas'); c.width = c.height = 256; var x = c.getContext('2d');
-    var g = x.createRadialGradient(128, 128, 0, 128, 128, 128); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(255,220,180,0.9)'); g.addColorStop(1, 'rgba(255,122,26,0)');
+    var g = x.createRadialGradient(128, 128, 0, 128, 128, 128); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(220,232,255,0.9)'); g.addColorStop(1, 'rgba(138,180,255,0)');
     x.fillStyle = g; x.fillRect(0, 0, 256, 256);
     x.fillStyle = '#fff'; x.beginPath();
     for (var k = 0; k < 16; k++) { var r = k % 2 ? 44 : 118, a = k * Math.PI / 8; x.lineTo(128 + Math.cos(a) * r, 128 + Math.sin(a) * r); }
@@ -299,22 +352,20 @@ window.Intro3D = (function () {
 
     var scene = G.scene = new THREE.Scene();
     scene.background = new THREE.Color(COL.bg);
-    scene.fog = new THREE.Fog(COL.bg, 9, 30);
+    scene.fog = new THREE.Fog(COL.bg, 10, 32);
 
-    scene.add(new THREE.HemisphereLight(0x8ea2ff, 0x3a2412, 0.9));
-    var key = new THREE.DirectionalLight(0xfff1dc, 2.2); key.position.set(3.5, 8, 6); key.castShadow = true;
+    scene.add(new THREE.HemisphereLight(0x9db4ff, 0x2a2c3a, 0.95));
+    var key = new THREE.DirectionalLight(0xfff3e4, 2.1); key.position.set(3.5, 8, 6); key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024); key.shadow.camera.left = -8; key.shadow.camera.right = 8; key.shadow.camera.top = 8; key.shadow.camera.bottom = -8;
     key.shadow.camera.near = 1; key.shadow.camera.far = 30; key.shadow.bias = -0.0008; key.shadow.normalBias = 0.02; scene.add(key);
-    var rim = new THREE.DirectionalLight(0x6d8bd6, 1.1); rim.position.set(-6, 5, -6); scene.add(rim);
-    var warm = new THREE.PointLight(0xff7a1a, 18, 14, 2); warm.position.set(0, 3.2, -2.5); scene.add(warm);
+    var rim = new THREE.DirectionalLight(COL.accent2, 1.2); rim.position.set(-6, 5, -6); scene.add(rim);
+    var cool = new THREE.PointLight(COL.accent, 16, 14, 2); cool.position.set(0, 3.2, -2.5); scene.add(cool);
 
     var floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({ map: floorTexture(), roughness: 0.92, metalness: 0 }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
-    // horizon glow strip behind the court
-    var glow = new THREE.Mesh(new THREE.PlaneGeometry(40, 6), new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.08, depthWrite: false }));
-    glow.position.set(0, 0.6, -9.5); glow.material.opacity = 0.06; scene.add(glow);
+    var glow = new THREE.Mesh(new THREE.PlaneGeometry(40, 6), new THREE.MeshBasicMaterial({ color: COL.accent, transparent: true, opacity: 0.06, depthWrite: false }));
+    glow.position.set(0, 0.6, -9.5); scene.add(glow);
 
-    // net
     var postMat = mat(0x4a5478, { roughness: 0.5, metalness: 0.3 });
     [4.95, -4.95].forEach(function (z) { var p = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, NET_TOP + 0.3, 12), postMat); p.position.set(0, (NET_TOP + 0.3) / 2, z); p.castShadow = true; scene.add(p); });
     var mesh = new THREE.Mesh(new THREE.PlaneGeometry(9.6, 1.0), new THREE.MeshBasicMaterial({ map: netTexture(), transparent: true, side: THREE.DoubleSide, depthWrite: false }));
@@ -327,36 +378,31 @@ window.Intro3D = (function () {
     var antTex = new THREE.CanvasTexture(stripes); antTex.colorSpace = THREE.SRGBColorSpace;
     [4.5, -4.5].forEach(function (z) { var a = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.8, 8), new THREE.MeshStandardMaterial({ map: antTex, roughness: 0.5 })); a.position.set(0, NET_TOP - 0.1, z); scene.add(a); });
 
-    // dust
     var n = 500, pos = new Float32Array(n * 3);
-    for (var d = 0; d < n; d++) { pos[d * 3] = (Math.random() - 0.5) * 16; pos[d * 3 + 1] = Math.random() * 5; pos[d * 3 + 2] = (Math.random() - 0.5) * 12; }
+    for (var d = 0; d < n; d++) { pos[d * 3] = (Math.random() - 0.5) * 16; pos[d * 3 + 1] = Math.random() * 5; pos[d * 3 + 2] = (Math.random() - 0.5) * 14; }
     var dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    G.dust = new THREE.Points(dg, new THREE.PointsMaterial({ color: 0xffc38a, size: 0.05, map: dotTexture(), alphaTest: 0.2, transparent: true, opacity: 0.6, depthWrite: false })); scene.add(G.dust);
+    G.dust = new THREE.Points(dg, new THREE.PointsMaterial({ color: COL.dust, size: 0.05, map: dotTexture(), alphaTest: 0.2, transparent: true, opacity: 0.6, depthWrite: false })); scene.add(G.dust);
 
-    // figures + ball
     G.hitter = makeFigure(HITTER); scene.add(G.hitter.root);
     G.setter = makeFigure(SETTER); scene.add(G.setter.root);
     G.ball = new THREE.Mesh(new THREE.SphereGeometry(0.105, 36, 24), new THREE.MeshStandardMaterial({ map: ballTexture(), roughness: 0.55 })); G.ball.castShadow = true; scene.add(G.ball);
 
-    // effects
     var streakMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false });
     G.streaks = [];
-    for (var s = 0; s < 5; s++) { var st = new THREE.Mesh(new THREE.BoxGeometry(1, 0.012, 0.012), streakMat); st.visible = false; scene.add(st); G.streaks.push(st); }
+    for (var s = 0; s < 5; s++) { var st = new THREE.Mesh(new THREE.BoxGeometry(1, 0.012, 0.012), streakMat.clone()); st.visible = false; scene.add(st); G.streaks.push(st); }
     G.dustPuffs = [];
-    var puffMat = new THREE.MeshBasicMaterial({ color: 0xffb26b, transparent: true, opacity: 0.5, depthWrite: false });
+    var puffMat = new THREE.MeshBasicMaterial({ color: COL.dust, transparent: true, opacity: 0.5, depthWrite: false });
     for (var q = 0; q < 5; q++) { var pf = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), puffMat.clone()); pf.visible = false; scene.add(pf); G.dustPuffs.push(pf); }
     G.star = new THREE.Sprite(new THREE.SpriteMaterial({ map: starTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false })); G.star.visible = false; G.star.renderOrder = 10; scene.add(G.star);
     G.ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, side: THREE.DoubleSide, depthWrite: false, depthTest: false })); G.ring.visible = false; G.ring.renderOrder = 9; scene.add(G.ring);
 
-    // cameras
-    G.cam1 = new THREE.PerspectiveCamera(40, 1, 0.05, 60);
-    G.cam2 = new THREE.PerspectiveCamera(56, 1, 0.03, 60);
+    G.cams = [new THREE.PerspectiveCamera(46, 1, 0.05, 60), new THREE.PerspectiveCamera(46, 1, 0.05, 60), new THREE.PerspectiveCamera(44, 1, 0.05, 60), new THREE.PerspectiveCamera(56, 1, 0.03, 60)];
 
-    // anchor points derived from the rig so the ball, hands and contact always line up
-    S.handsPt = setterHands(T.setStart);
+    // anchor points derived from the rig so hands, toss and contact always line up
+    S.handsPass = setterHands(T.setContact);
+    S.handsRelease = setterHands(T.setRelease);
     S.contactPt = hitterHand(T.contact);
 
-    // overlay ui + speed lines
     var ui = dom.ui = document.createElement('div');
     ui.className = 'intro-ui';
     var site = window.SITE || {};
@@ -367,8 +413,7 @@ window.Intro3D = (function () {
     dom.rays = ui.querySelector('.intro-rays');
     dom.rayData = [];
     for (var r = 0; r < 60; r++) {
-      var ang = Math.random() * Math.PI * 2;
-      dom.rayData.push({ a: ang, len: 120 + Math.random() * 420, w: 1 + Math.random() * 3, off: Math.random(), op: 0.15 + Math.random() * 0.5 });
+      dom.rayData.push({ a: Math.random() * Math.PI * 2, len: 120 + Math.random() * 420, w: 1 + Math.random() * 3, off: Math.random(), op: 0.15 + Math.random() * 0.5 });
       var ln = document.createElementNS('http://www.w3.org/2000/svg', 'line'); ln.setAttribute('stroke', '#ffffff'); ln.setAttribute('stroke-linecap', 'round'); dom.rays.appendChild(ln);
     }
     dom.flash = document.createElement('div'); dom.flash.className = 'intro-flash'; root.appendChild(dom.flash);
@@ -389,86 +434,101 @@ window.Intro3D = (function () {
     if (!G.renderer) return;
     S.w = window.innerWidth; S.h = window.innerHeight;
     G.renderer.setSize(S.w, S.h);
-    var aspect = S.w / S.h;
-    [G.cam1, G.cam2].forEach(function (c, i) { c.aspect = aspect; c.fov = aspect < 1 ? (i ? 78 : 66) : (i ? 56 : 40); c.updateProjectionMatrix(); });
+    var aspect = S.w / S.h, portrait = aspect < 1;
+    var fovs = portrait ? [68, 70, 68, 78] : [46, 46, 44, 56];
+    G.cams.forEach(function (c, i) { c.aspect = aspect; c.fov = fovs[i]; c.updateProjectionMatrix(); });
   }
 
   /* ---------- rendering ---------- */
   var tmpV = null;
-  function renderShot1(ts, tRaw) {
+  function hideFx() { G.star.visible = false; G.ring.visible = false; G.streaks.forEach(function (s) { s.visible = false; }); G.dustPuffs.forEach(function (p) { p.visible = false; }); }
+  function renderCourt(ts, t) {
     var hp = hitterPose(ts), sp = setterPose(ts);
     applyPose(G.hitter, hp); applyPose(G.setter, sp);
     var b = ballState(ts);
     G.ball.visible = b.vis; G.ball.position.copy(b.pos);
-    G.ball.rotation.set(ts * 2.2, 0, -ts * 9);
-    // speed streaks behind the runner
-    var run = ts > T.runStart + 0.15 && ts < T.runEnd + 0.05 ? seg(ts, T.runStart + 0.15, T.runStart + 0.4, 'outQ') * (1 - seg(ts, T.runEnd - 0.1, T.runEnd + 0.05, 'lin')) : 0;
+    G.ball.rotation.set(ts * 2.2, 0, -ts * 6);
+    // speed streaks behind the runner during the last strides
+    var s = hitterDist(ts);
+    var run = ts < T.plant + 0.05 ? seg(s, 0.6, 1.4, 'outQ') * (1 - seg(ts, T.plant - 0.05, T.plant + 0.05, 'lin')) : 0;
     G.streaks.forEach(function (st, i) {
       st.visible = run > 0.02;
       var len = 0.5 + i * 0.12 + Math.sin(ts * 31 + i * 2) * 0.18;
-      st.scale.x = len; st.position.set(hp.x - 0.45 - i * 0.06 - len / 2, 0.95 + i * 0.13 + Math.sin(ts * 40 + i) * 0.02, 0.18 - i * 0.09);
-      st.material.opacity = 0.35 * run;
+      var back = 0.45 + i * 0.06 + len / 2, side = (i - 2) * 0.09;
+      st.position.set(hp.x - PD.x * back + PN.x * side, 0.95 + i * 0.13 + Math.sin(ts * 40 + i) * 0.02, hp.z - PD.z * back + PN.z * side);
+      st.rotation.y = YAW * rad; st.scale.x = len; st.material.opacity = 0.35 * run;
     });
-    var du = seg(ts, T.runEnd + 0.02, T.runEnd + 0.5, 'outC');
+    var du = seg(ts, T.plant + 0.02, T.plant + 0.5, 'outC');
     G.dustPuffs.forEach(function (pf, i) {
       pf.visible = du > 0 && du < 1;
-      pf.position.set(hp.x - 0.15 - i * 0.12 - du * 0.35 * (i + 1) / 2, 0.06 + du * (0.12 + i * 0.06), (i - 2) * 0.12);
-      var sc = 0.6 + du * 2.2; pf.scale.setScalar(sc); pf.material.opacity = 0.5 * (1 - du);
+      var back = 0.15 + i * 0.12 + du * 0.35 * (i + 1) / 2, side = (i - 2) * 0.12;
+      pf.position.set(hp.x - PD.x * back + PN.x * side, 0.06 + du * (0.12 + i * 0.06), hp.z - PD.z * back + PN.z * side);
+      pf.scale.setScalar(0.6 + du * 2.2); pf.material.opacity = 0.5 * (1 - du);
     });
-    // impact
     var C = T.contact, imp = ts >= C;
-    var s = 0.25 + 1.0 * seg(ts, C, C + 0.1, 'outC');
+    var sc = 0.25 + 1.0 * seg(ts, C, C + 0.1, 'outC');
     var starOp = imp ? 1 - seg(ts, C + 0.02, C + 0.3, 'inQ') : 0;
-    G.star.visible = imp && starOp > 0; G.star.position.copy(S.contactPt); G.star.scale.setScalar(s * 1.3); G.star.material.opacity = starOp; G.star.material.rotation = ts * 1.5;
+    G.star.visible = imp && starOp > 0; G.star.position.copy(S.contactPt); G.star.scale.setScalar(sc * 1.4); G.star.material.opacity = starOp; G.star.material.rotation = ts * 1.5;
     var ru = seg(ts, C, C + 0.32, 'outC');
     G.ring.visible = imp && ru < 1; G.ring.position.copy(S.contactPt); G.ring.scale.setScalar(0.08 + 1.4 * ru); G.ring.material.opacity = 0.8 * (1 - ru);
-    // camera 1: dollies right with the approach, keeps the hitter framed
-    var cx = track(ts, [[0, -4.4, 'lin'], [T.runEnd, -2.4, 'inOutQ'], [T.contact, -1.6, 'outQ']]);
-    var cy = track(ts, [[0, 1.55, 'lin'], [T.plantEnd, 1.45, 'inOutQ'], [T.contact, 1.75, 'outQ']]);
-    var cz = track(ts, [[0, 6.2, 'lin'], [T.contact, 5.2, 'inOutQ']]);
-    var lx = track(ts, [[0, -3.2, 'lin'], [T.runEnd, -1.7, 'inOutQ'], [T.contact, -1.0, 'outQ']]);
-    var ly = track(ts, [[0, 1.05, 'lin'], [T.plantEnd, 1.05, 'lin'], [T.contact, 1.65, 'outQ']]);
-    var shake = imp ? (1 - seg(ts, C, C + 0.3, 'lin')) * 0.06 : 0;
-    var cam = G.cam1;
-    cam.position.set(cx + Math.sin(tRaw * 120) * shake, cy + Math.cos(tRaw * 97) * shake, cz);
-    G.ring.lookAt(cam.position);
-    cam.lookAt(lx, ly, 0);
-    if (dom.rays) dom.rays.style.opacity = 0;
-    G.renderer.render(G.scene, cam);
+    return hp;
   }
-  function renderShot2(t2, ts) {
-    var hp = hitterPose(ts), sp = setterPose(ts);
-    applyPose(G.hitter, hp); applyPose(G.setter, sp);
-    G.star.visible = false; G.ring.visible = false; G.streaks.forEach(function (s) { s.visible = false; }); G.dustPuffs.forEach(function (p) { p.visible = false; });
-    var cam = G.cam2;
-    var camPos = v3(2.7, 1.05, 0.35);
-    cam.position.copy(camPos).add(v3(Math.sin(t2 * 9) * 0.012, Math.cos(t2 * 7) * 0.01, 0));
-    var u = clamp01(t2 / T.flight);
-    var e = u * u * (3 - 2 * u); // smoothstep: leaves the hand fast, keeps coming
-    var target = camPos.clone().add(v3(-0.02, 0.02, 0));
-    var pos = S.contactPt.clone().lerp(target, Math.min(0.94, e));
-    G.ball.visible = true; G.ball.position.copy(pos);
-    G.ball.rotation.set(t2 * 6, 0, -t2 * 14);
-    cam.lookAt(S.contactPt.x, S.contactPt.y - 0.25, S.contactPt.z);
-    G.renderer.render(G.scene, cam);
-    // anime focus lines converging on the ball
-    tmpV = tmpV || new THREE.Vector3();
-    tmpV.copy(pos).project(cam);
-    var bx = (tmpV.x * 0.5 + 0.5) * 1600, by = (0.5 - tmpV.y * 0.5) * 900;
-    var dist = pos.distanceTo(cam.position);
-    var inner = Math.min(900, 40 + 80 / Math.max(0.05, dist));
-    var lines = dom.rays.children;
-    dom.rays.style.opacity = Math.min(1, t2 * 4) * (1 - seg(t2, T.fadeAt, T.fadeAt + 0.3, 'lin'));
-    for (var i = 0; i < lines.length; i++) {
-      var rd = dom.rayData[i];
-      var r0 = inner + ((rd.off + t2 * 2.5) % 1) * 60, r1 = r0 + rd.len * (0.6 + 0.4 * Math.sin(t2 * 30 + i));
-      lines[i].setAttribute('x1', bx + Math.cos(rd.a) * r0); lines[i].setAttribute('y1', by + Math.sin(rd.a) * r0);
-      lines[i].setAttribute('x2', bx + Math.cos(rd.a) * r1); lines[i].setAttribute('y2', by + Math.sin(rd.a) * r1);
-      lines[i].setAttribute('stroke-width', rd.w.toFixed(1));
-      lines[i].setAttribute('stroke-opacity', (rd.op * (0.5 + 0.5 * Math.sin(t2 * 40 + i * 1.7))).toFixed(2));
+  function renderShot(t) {
+    var ts = sceneTime(t);
+    var hp = renderCourt(ts, t);
+    var cam, shake = 0;
+    var imp = ts >= T.contact;
+    if (imp) shake = (1 - seg(t, 3.525, 3.85, 'lin')) * 0.05;
+    if (t < T.shotB) {                                   // A: wide, the toss goes up
+      cam = G.cams[0];
+      var pa = seg(t, 0, T.shotB, 'inOutQ');
+      cam.position.set(-1.6 - 0.4 * pa, 2.7 - 0.2 * pa, 10.6 - 0.9 * pa);
+      cam.lookAt(-2.3, 1.9 + 0.2 * pa, 2.8);
+    } else if (t < T.shotC) {                            // B: low camera chasing the approach
+      cam = G.cams[1];
+      var lagPos = onPath(hitterDist(ts - 0.06));
+      var camY = 0.75 + 0.35 * seg(ts, T.takeoff, T.peak, 'outQ');
+      cam.position.set(lagPos.x - PD.x * 2.3 + PN.x * 1.05, camY, lagPos.z - PD.z * 2.3 + PN.z * 1.05);
+      cam.lookAt(hp.x + PD.x * 0.6, hp.y + 0.45, hp.z + PD.z * 0.6);
+    } else if (t < T.cut) {                              // C: from across the net, looking up as he rises
+      cam = G.cams[2];
+      var o = seg(t, T.shotC, T.cut, 'inOutQ');
+      cam.position.set(1.9 - 0.6 * o + Math.sin(t * 120) * shake, 0.7 + 0.25 * o + Math.cos(t * 97) * shake, 5.3 - 0.9 * o);
+      cam.lookAt(hp.x, hp.y + 0.35, hp.z + 0.55);
+      cam.fov = (S.w / S.h < 1 ? 68 : 44) - 6 * seg(t, T.shotC, 3.465, 'inOutQ'); cam.updateProjectionMatrix();
+    } else {                                             // D: the receiver's view; the ball comes at the camera
+      cam = G.cams[3];
+      hideFx();
+      var t2 = t - T.cut;
+      var camPos = v3(4.3, 1.0, 2.6);
+      cam.position.copy(camPos).add(v3(Math.sin(t2 * 9) * 0.012, Math.cos(t2 * 7) * 0.01, 0));
+      var u = clamp01(t2 / T.flight), e = u * u * (3 - 2 * u);
+      var target = camPos.clone().add(v3(-0.02, 0.02, 0));
+      var bpos = S.contactPt.clone().lerp(target, Math.min(0.94, e));
+      G.ball.visible = true; G.ball.position.copy(bpos); G.ball.rotation.set(t2 * 6, 0, -t2 * 14);
+      cam.lookAt(S.contactPt.x, S.contactPt.y - 0.3, S.contactPt.z);
+      G.renderer.render(G.scene, cam);
+      tmpV = tmpV || new THREE.Vector3();
+      tmpV.copy(bpos).project(cam);
+      var bx = (tmpV.x * 0.5 + 0.5) * 1600, by = (0.5 - tmpV.y * 0.5) * 900;
+      var dist = bpos.distanceTo(cam.position), inner = Math.min(900, 40 + 80 / Math.max(0.05, dist));
+      var lines = dom.rays.children;
+      dom.rays.style.opacity = Math.min(1, t2 * 4) * (1 - seg(t2, T.fadeAt, T.fadeAt + 0.3, 'lin'));
+      for (var i = 0; i < lines.length; i++) {
+        var rd = dom.rayData[i];
+        var r0 = inner + ((rd.off + t2 * 2.5) % 1) * 60, r1 = r0 + rd.len * (0.6 + 0.4 * Math.sin(t2 * 30 + i));
+        lines[i].setAttribute('x1', bx + Math.cos(rd.a) * r0); lines[i].setAttribute('y1', by + Math.sin(rd.a) * r0);
+        lines[i].setAttribute('x2', bx + Math.cos(rd.a) * r1); lines[i].setAttribute('y2', by + Math.sin(rd.a) * r1);
+        lines[i].setAttribute('stroke-width', rd.w.toFixed(1));
+        lines[i].setAttribute('stroke-opacity', (rd.op * (0.5 + 0.5 * Math.sin(t2 * 40 + i * 1.7))).toFixed(2));
+      }
+      return;
     }
+    G.ring.lookAt(cam.position);
+    dom.rays.style.opacity = 0;
+    G.renderer.render(G.scene, cam);
   }
-  var BEATS_DEFAULT = ['Approach', 'Quick set', 'Spike'];
+  var BEATS_DEFAULT = ['Open toss', 'Approach', 'Spike'];
   function setBeat(idx) {
     if (idx === S.lastBeat) return;
     S.lastBeat = idx;
@@ -479,19 +539,19 @@ window.Intro3D = (function () {
     dom.beat.classList.add('show');
   }
   function renderAt(t) {
-    var C = T.contact;
-    var ts = t < C ? t : (t < C + T.hitStop ? C : t - T.hitStop);
-    // dust drift
     var arr = G.dust.geometry.attributes.position.array;
     for (var i = 1; i < arr.length; i += 3) { arr[i] += 0.0006; if (arr[i] > 5) arr[i] = 0; }
     G.dust.geometry.attributes.position.needsUpdate = true;
-    if (t < T.cut) renderShot1(ts, t); else renderShot2(t - T.cut, ts);
+    renderShot(t);
     G.renderer.domElement.style.opacity = seg(t, 0, T.fadeIn, 'outQ').toFixed(2);
+    var C = 3.525; // real-time moment of contact
     var f1 = t >= C ? (t < C + 0.05 ? seg(t, C, C + 0.05, 'outQ') * 0.85 : 0.85 * (1 - seg(t, C + 0.05, C + 0.3, 'outQ'))) : 0;
     var hit = T.cut + T.fadeAt;
     var f2 = t >= hit - 0.03 ? (t < hit ? seg(t, hit - 0.03, hit, 'lin') : 1 - seg(t, hit, hit + 0.35, 'outQ')) : 0;
-    dom.flash.style.opacity = Math.max(f1, f2 * 0.95).toFixed(2);
-    setBeat(ts < T.runStart ? -1 : ts < T.setStart - 0.05 ? 0 : ts < C ? 1 : 2);
+    var f3 = t >= T.cut - 0.02 && t < T.cut + 0.08 ? 0.35 * (1 - seg(t, T.cut, T.cut + 0.08, 'outQ')) : 0;
+    dom.flash.style.opacity = Math.max(f1, f2 * 0.95, f3).toFixed(2);
+    var ts = sceneTime(t);
+    setBeat(ts < T.passStart + 0.3 ? -1 : ts < T.runStart + 0.15 ? 0 : ts < T.takeoff + 0.1 ? 1 : 2);
   }
 
   /* ---------- playback ---------- */
@@ -541,7 +601,7 @@ window.Intro3D = (function () {
     renderAt(0);
     S.raf = requestAnimationFrame(tick);
   }
-  /** Debug/preview: show the frame at time t (seconds) and pause. */
+  /** Debug/preview: show the frame at real time t (seconds) and pause. */
   function seek(t) {
     build();
     cancelAnimationFrame(S.raf);
@@ -552,5 +612,5 @@ window.Intro3D = (function () {
     renderAt(t);
     G.renderer.domElement.style.opacity = t < T.fadeIn ? seg(t, 0, T.fadeIn, 'outQ') : 1;
   }
-  return { play: play, finish: finish, seek: seek, supported: supported, T: T };
+  return { play: play, finish: finish, seek: seek, supported: supported, T: T, sceneTime: sceneTime };
 })();

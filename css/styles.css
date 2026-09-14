@@ -3,18 +3,18 @@
    (they are applied at runtime) or edit the defaults here.
    ========================================================= */
 :root {
-  --bg: #070a14;
-  --bg-2: #0c1122;
+  --bg: #12141f;
+  --bg-2: #181b2b;
   --surface: rgba(255, 255, 255, 0.045);
   --surface-2: rgba(255, 255, 255, 0.08);
   --line: rgba(255, 255, 255, 0.10);
   --line-strong: rgba(255, 255, 255, 0.20);
-  --text: #eef2ff;
-  --muted: #98a3bd;
-  --faint: #5f6a84;
-  --accent: #ff7a1a;
-  --accent-2: #6d8bd6;
-  --on-accent: #180b00;
+  --text: #e6e9f5;
+  --muted: #9aa3c0;
+  --faint: #68728e;
+  --accent: #8ab4ff;
+  --accent-2: #b9a6ff;
+  --on-accent: #0b1020;
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
 
   --font-display: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -29,8 +29,11 @@
   --gutter: clamp(16px, 4vw, 48px);
 }
 html[data-theme="light"] {
-  --bg: #f4f5f9;
+  --bg: #f4f6fb;
   --bg-2: #ffffff;
+  --accent: #3a6fe3;
+  --accent-2: #7a5fd0;
+  --on-accent: #ffffff;
   --surface: rgba(12, 18, 40, 0.045);
   --surface-2: rgba(12, 18, 40, 0.08);
   --line: rgba(12, 18, 40, 0.10);
@@ -131,6 +134,55 @@ button { font: inherit; color: inherit; }
 .nav-toggle { display: none; }
 html[data-theme="dark"] .icon-moon { display: none; }
 html[data-theme="light"] .icon-sun { display: none; }
+
+/* ---------- music ---------- */
+.music { position: relative; display: flex; }
+.music[hidden] { display: none; }
+.music-btn { position: relative; }
+.music-btn .eq { position: absolute; right: 5px; bottom: 7px; display: flex; align-items: flex-end; gap: 1.5px; height: 8px; }
+.music-btn .eq i { width: 2px; height: 2px; background: var(--accent); border-radius: 1px; transition: height .3s; }
+.music.playing .music-btn .eq i { animation: eq 1.1s ease-in-out infinite; }
+.music.playing .music-btn .eq i:nth-child(2) { animation-delay: .25s; }
+.music.playing .music-btn .eq i:nth-child(3) { animation-delay: .5s; }
+.music.playing .music-btn, .music.open .music-btn { color: var(--text); }
+.music.muted .music-btn { color: var(--faint); }
+.music.muted .music-btn .eq i { background: var(--faint); animation: none; height: 2px; }
+@keyframes eq { 0%, 100% { height: 2px; } 50% { height: 8px; } }
+@media (prefers-reduced-motion: reduce) { .music.playing .music-btn .eq i { animation: none; height: 6px; } }
+.music-panel {
+  position: absolute; top: calc(100% + 8px); right: 0; width: min(92vw, 340px);
+  padding: .8rem; border-radius: 12px; display: grid; gap: .7rem;
+  background: color-mix(in srgb, var(--bg-2) 94%, transparent);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  border: 1px solid var(--line); box-shadow: var(--shadow);
+  opacity: 0; visibility: hidden; transform: translateY(6px);
+  transition: opacity .2s, transform .2s, visibility 0s linear .2s;
+}
+.music.open .music-panel { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+.music-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: 0 .2rem; }
+.music-status { font-size: .78rem; color: var(--muted); text-align: right; }
+.music-yt { aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; border: 1px solid var(--line); }
+.music-yt[hidden] { display: none; }
+.music-yt iframe, .music-yt > div { width: 100%; height: 100%; display: block; border: 0; }
+.music-list { display: grid; gap: .15rem; }
+.music-list button {
+  display: grid; grid-template-columns: .6rem minmax(0, 1fr) auto; align-items: center; gap: .6rem;
+  width: 100%; text-align: left; padding: .5rem .55rem; border: 0; border-radius: 8px; background: none; cursor: pointer; color: var(--muted); transition: background .15s, color .15s;
+}
+.music-list button:hover { background: var(--surface); color: var(--text); }
+.music-list button.active { background: var(--surface-2); color: var(--text); }
+.music-list .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); }
+.music-list button.active .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.music-list .t { font-size: .9rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.music-list .k { font-family: var(--font-mono); font-size: .58rem; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.music-controls { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; padding-top: .3rem; border-top: 1px solid var(--line); }
+.music-vol { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto; font-family: var(--font-mono); font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.music-vol input { width: 80px; accent-color: var(--accent); }
+
+/* ---------- visitor counter (home) ---------- */
+.visitor-line { margin: 1.5rem 0 0; font-family: var(--font-mono); font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); display: flex; flex-wrap: wrap; align-items: baseline; gap: .45rem; }
+.visitor-line[hidden] { display: none; }
+.visitor-line b { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; letter-spacing: -.02em; text-transform: none; color: var(--accent); font-variant-numeric: tabular-nums; }
 
 /* ---------- left pop-up rail ---------- */
 .rail { position: fixed; left: 0; top: 0; bottom: 0; z-index: 55; pointer-events: none; }
@@ -392,6 +444,8 @@ a.chip:hover, .chip.active { border-color: var(--accent); color: var(--accent); 
   .rail-tab-label { writing-mode: horizontal-tb; transform: none; }
   .rail-tab-dots { width: 22px; height: 6px; background: radial-gradient(circle, var(--accent) 2px, transparent 2.5px) 0 0 / 8px 6px repeat-x; }
   .rail-panel { width: min(86vw, 330px); }
+  .music { position: static; }
+  .music-panel { position: fixed; top: calc(var(--chrome-h) + 8px); right: var(--gutter); left: auto; width: min(92vw, 360px); }
   .rail.open .rail-tab { transform: none; }
   .row { grid-template-columns: 2.4rem minmax(0, 1fr) 1.6rem; padding: 1rem .5rem; }
   .row-meta { display: none; }

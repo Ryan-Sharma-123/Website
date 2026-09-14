@@ -6,7 +6,7 @@
   <!-- The title / description are filled in from content/site.js at runtime. -->
   <title>Personal site</title>
   <meta name="description" content="">
-  <meta name="theme-color" content="#070a14">
+  <meta name="theme-color" content="#12141f">
   <link rel="icon" href="assets/images/favicon.svg" type="image/svg+xml">
 
   <!-- Fonts: Space Grotesk (display), DM Sans (body), Space Mono (labels), EB Garamond (blog). -->
@@ -58,6 +58,13 @@
     </nav>
 
     <div class="tools">
+      <div class="music" id="music">
+        <button id="music-btn" class="icon-btn music-btn" type="button" aria-expanded="false" aria-controls="music-panel" aria-label="Music">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16.5" cy="16" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+          <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+        </button>
+        <div class="music-panel" id="music-panel"></div>
+      </div>
       <button id="replay-intro" class="icon-btn" type="button" title="Replay intro" aria-label="Replay intro">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.5-5.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 4v5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -101,6 +108,8 @@
   <script src="js/util.js"></script>
   <script src="js/markdown.js"></script>
   <script src="js/background.js"></script>
+  <script src="js/visitors.js"></script>
+  <script src="js/music.js"></script>
   <script src="js/intro.js"></script>
   <!-- 3D intro: Three.js (vendored, MIT) + the scene. Delete these two lines to use the lighter 2D intro only. -->
   <script src="js/vendor/three.min.js"></script>

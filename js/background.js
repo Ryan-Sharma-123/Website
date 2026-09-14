@@ -4,13 +4,14 @@
 window.Background = (function () {
   'use strict';
   var canvas, ctx, W = 0, H = 0, dpr = 1, cfg = {}, items = [], dust = [], raf = 0, running = false, last = 0;
-  var colors = { text: '#eef2ff', accent: '#ff7a1a', accent2: '#6d8bd6', dark: true };
+  var colors = { text: '#e6e9f5', accent: '#8ab4ff', accent2: '#b9a6ff', dark: true };
   var reduced = window.U && window.U.prefersReducedMotion();
   var pointer = { x: 0.5, y: 0.5, tx: 0.5, ty: 0.5 };
 
   var GLYPHS = ['∑', '∫', 'π', '√', 'λ', '∞', '∂', '∇', '∀', '∃',
     'x²', 'f(x)', 'O(n)', 'ℕ', 'ℝ', '{ }', '</>', '=>', '::', '0x1F', 'if', 'fn', '++',
-    '✦', '★', '♪', 'カ', 'タ', '♠', '▲', '■', '●'];
+    '✦', '★', '♪', 'カ', 'タ', '♠', '▲', '■', '●',
+    '♞', '♜', '♚', '♝', 'e4', 'Nf3'];
   var SHAPES = ['volleyball', 'volleyball', 'basketball', 'controller', 'net'];
 
   function readColors() {
@@ -133,7 +134,7 @@ window.Background = (function () {
     var h = hex.replace('#', '');
     if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
     var n = parseInt(h, 16);
-    if (isNaN(n)) return 'rgba(255,122,26,' + a + ')';
+    if (isNaN(n)) return 'rgba(138,180,255,' + a + ')';
     return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
   }
 

@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0c1122"/><stop offset="1" stop-color="#070a14"/></linearGradient>
-    <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0H0V80" fill="none" stroke="#ff7a1a" stroke-opacity=".14"/></pattern>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#181b2b"/><stop offset="1" stop-color="#12141f"/></linearGradient>
+    <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0H0V80" fill="none" stroke="#8ab4ff" stroke-opacity=".14"/></pattern>
   </defs>
   <rect width="1600" height="900" fill="url(#bg)"/>
   <rect width="1600" height="900" fill="url(#grid)"/>
-  <g transform="translate(800 400)" fill="none" stroke="#ff7a1a" stroke-width="10" stroke-linecap="round">
+  <g transform="translate(800 400)" fill="none" stroke="#8ab4ff" stroke-width="10" stroke-linecap="round">
     <circle r="150" stroke-opacity=".9"/>
     <path d="M-145-45c50 6 100 40 130 130M-62-136c18 46 76 92 156 100M-128 74c56-24 104-70 130-142" stroke-opacity=".9"/>
   </g>

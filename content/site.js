@@ -21,7 +21,8 @@ window.SITE = {
     { icon: "🎮", label: "Gaming" },
     { icon: "✦", label: "Anime" },
     { icon: "🏀", label: "Basketball" },
-    { icon: "🏐", label: "Volleyball" }
+    { icon: "🏐", label: "Volleyball" },
+    { icon: "♞", label: "Chess" }
   ],
 
   // Links shown in the footer and on the About page.
@@ -36,8 +37,36 @@ window.SITE = {
   theme: {
     default: "dark",      // "dark" or "light"
     allowToggle: true,    // show the sun/moon button
-    accent: "#ff7a1a",    // primary accent (volleyball orange)
-    accent2: "#6d8bd6"    // secondary accent (setter blue)
+    accent: "#8ab4ff",        // primary accent on the dark theme (soft sky blue)
+    accent2: "#b9a6ff",       // secondary accent on the dark theme (lavender)
+    accentLight: "#3a6fe3",   // the same two roles on the light theme (darker, for contrast)
+    accent2Light: "#7a5fd0"
+  },
+
+  // "You're the 42nd person to visit this website." on the home page. Each browser gets a number
+  // the first time it visits and keeps it. Counts are stored by a free public counter service
+  // (abacus.jasoncameron.dev); pick a namespace nobody else is likely to use.
+  visitorCounter: {
+    enabled: true,
+    endpoint: "https://abacus.jasoncameron.dev",
+    namespace: "ryan-sharma-123-website",
+    key: "visitors",
+    template: "You're the {n} person to visit this website."
+  },
+
+  // Music button in the top-right corner. "youtube" stations play a YouTube video or 24/7 stream
+  // (the id is the part of the address after watch?v=); "synth" stations are generated in the
+  // browser and need no internet.
+  music: {
+    enabled: true,
+    volume: 0.6,
+    stations: [
+      { name: "Lofi Girl · beats to relax/study to", type: "youtube", id: "jfKfPfyJRdk" },
+      { name: "Lofi Girl · beats to sleep/chill to", type: "youtube", id: "rUxyKA_-grg" },
+      { name: "Chillhop · jazzy & lofi beats", type: "youtube", id: "5yx6BWlEVcY" },
+      { name: "Built-in lofi (generated, works offline)", type: "synth", preset: "lofi" },
+      { name: "Built-in 8-bit (generated)", type: "synth", preset: "chip" }
+    ]
   },
 
   // The volleyball spike intro.
@@ -45,7 +74,7 @@ window.SITE = {
     mode: "session",      // "session" = once per browser session, "always" = every visit, "never" = off
     style: "3d",          // "3d" (Three.js scene) or "2d" (flat SVG version; also the automatic fallback without WebGL)
     skippable: true,      // show the SKIP button
-    beats: ["Approach", "Quick set", "Spike"] // the three labels shown bottom-left during the animation
+    beats: ["Open toss", "Approach", "Spike"] // the three labels shown bottom-left during the animation
   },
 
   // Ambient background.

@@ -1,7 +1,7 @@
 # Personal website
 
 A hand-built personal site: **projects** with embedded demos, a **blog** in Garamond, an **about / résumé** page,
-a volleyball **intro animation**, and a quiet themed background. No framework, no build step — one folder of
+a 3D volleyball **intro animation**, a **visitor counter**, a **music button**, and a quiet themed background. No framework, no build step — one folder of
 HTML, CSS and JavaScript that you can edit with any text editor and host for free on GitHub Pages.
 
 ```
@@ -115,16 +115,40 @@ chips) or free `text`.
 
 ## Customise the look
 
-- **Colours:** `theme.accent` / `theme.accent2` in `content/site.js`, or the tokens at the top of `css/styles.css`.
-  Dark is the default; the sun/moon button toggles a light theme (set `allowToggle: false` to hide it).
+- **Colours:** `theme.accent` / `theme.accent2` (dark theme) and `theme.accentLight` / `theme.accent2Light` (light theme)
+  in `content/site.js`, or the tokens at the top of `css/styles.css`. The default is a slate background with a soft
+  blue and lavender pair. Dark is the default theme; the sun/moon button toggles light (set `allowToggle: false` to hide it).
 - **Fonts:** loaded from Google Fonts in `index.html` (Space Grotesk, DM Sans, Space Mono, EB Garamond).
   Swap the `<link>` and the `--font-*` variables in `css/styles.css`.
 - **Background:** `background` in `content/site.js` turns the particles, symbols and court grid on/off and sets the intensity.
-- **Intro:** `introAnimation.mode` is `"session"` (once per browser session), `"always"` or `"never"`, and
-  `introAnimation.style` is `"3d"` (a Three.js scene, `js/intro3d.js`) or `"2d"` (the flat SVG version, `js/intro.js`,
-  which is also the automatic fallback when WebGL is unavailable). Timing lives in the `T` object at the top of each
-  file; colours in `COL`. The ↻ button in the top bar replays it. The intro is skipped automatically for visitors who
+- **Intro:** the 3D version (`js/intro3d.js`) is an open spike: a high toss, a three-step approach, a big jump with a
+  slow-motion beat at the top, the swing, then the receiver's view as the ball flies at the camera. `introAnimation.mode`
+  is `"session"` (once per browser session), `"always"` or `"never"`; `introAnimation.style` is `"3d"` or `"2d"`
+  (the flat SVG quick attack in `js/intro.js`, also the automatic fallback without WebGL). Timing lives in the `T` object
+  and the `TIME_MAP` (slow motion / freeze frame) at the top of `js/intro3d.js`; colours in `COL`. The ↻ button in the top bar replays it. The intro is skipped automatically for visitors who
   prefer reduced motion. Three.js is vendored in `js/vendor/` (MIT licence), so nothing is loaded from a CDN for it.
+
+## Visitor counter
+
+The home page says "You're the 1,234th person to visit this website." Each browser is counted once (the number is
+kept in its localStorage), and the count itself lives in a free public counter service, [Abacus](https://abacus.jasoncameron.dev),
+so nothing needs a server. Settings are under `visitorCounter` in `content/site.js`: pick a `namespace` nobody else is
+likely to use, change the `template`, or set `enabled: false`. If the service cannot be reached the line simply stays hidden.
+Anyone who knows the namespace and key can bump the number, which is the trade-off for a free counter; for a private
+one, point `endpoint` at your own tiny API that returns `{ "value": n }` for `GET /hit/<namespace>/<key>`.
+
+## Music button
+
+The note icon in the top bar opens a small panel with stations, play/pause, mute and volume; playback keeps going
+while you move between pages. Two station types live in `music.stations` in `content/site.js`:
+
+- `{ type: "youtube", id: "…" }` plays a YouTube video or 24/7 stream in a small official player inside the panel
+  (the id is the part of the address after `watch?v=`). Stream ids occasionally change; if one stops working, copy
+  the new id from the stream's page.
+- `{ type: "synth", preset: "lofi" | "chip" }` is music generated in the browser with the Web Audio API — a mellow
+  lofi loop or an 8-bit one. No files, no internet, nothing to license.
+
+Browsers only start sound after a click, so the first press of Play is always needed. Set `music.enabled: false` to hide the button.
 
 ## Check your content
 
