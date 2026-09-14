@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#101736"/><stop offset="1" stop-color="#070a14"/></linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <g stroke="#6d8bd6" stroke-opacity=".25" stroke-width="2" fill="none">
+    <path d="M100 640 Q 600 120 1100 640"/>
+    <path d="M100 700 Q 600 180 1100 700"/>
+  </g>
+  <circle cx="600" cy="300" r="64" fill="#ff7a1a"/>
+  <path d="M540 280c22 3 46 20 60 60M572 246c8 20 34 42 68 44M546 336c26-12 48-34 60-68" fill="none" stroke="#12141f" stroke-width="5" stroke-linecap="round"/>
+  <text x="600" y="470" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="22" fill="#9aa7c0" letter-spacing="6">POST IMAGE</text>
+  <text x="600" y="510" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="24" fill="#5f6a84">Optional. Delete the image field to hide it.</text>
+</svg>

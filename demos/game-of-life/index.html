@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game of Life</title>
+<style>
+  :root { --bg:#0c1122; --line:rgba(255,255,255,.08); --text:#eef2ff; --muted:#98a3bd; --accent:#ff7a1a; --accent2:#6d8bd6; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:"DM Sans", system-ui, sans-serif; overflow:hidden; }
+  .wrap { display:flex; flex-direction:column; height:100%; }
+  canvas { flex:1; width:100%; display:block; cursor:crosshair; touch-action:none; }
+  .bar { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem; padding:.5rem .6rem; border-top:1px solid var(--line); background:#0a0e1c; font-family:"Space Mono", ui-monospace, monospace; font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; }
+  button { font:inherit; letter-spacing:inherit; text-transform:inherit; color:var(--text); background:none; border:1px solid rgba(255,255,255,.2); border-radius:2rem; padding:.42rem .7rem; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#180b00; }
+  label { display:inline-flex; align-items:center; gap:.4rem; color:var(--muted); margin-left:.3rem; }
+  input[type=range] { width:90px; accent-color:var(--accent); }
+  .gen { margin-left:auto; color:var(--muted); }
+  .gen b { color:var(--accent); font-weight:400; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <canvas id="c"></canvas>
+  <div class="bar">
+    <button id="play" class="primary">Play</button>
+    <button id="step">Step</button>
+    <button id="random">Random</button>
+    <button id="clear">Clear</button>
+    <label>Speed <input id="speed" type="range" min="1" max="30" value="10"></label>
+    <span class="gen">Gen <b id="gen">0</b></span>
+  </div>
+</div>
+<script>
+(function () {
+  var canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  var CELL = 14, cols = 0, rows = 0, grid, next, running = false, gen = 0, acc = 0, last = 0, dpr = 1;
+  function resize() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    var w = canvas.clientWidth, h = canvas.clientHeight;
+    canvas.width = w * dpr; canvas.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var nc = Math.max(10, Math.floor(w / CELL)), nr = Math.max(10, Math.floor(h / CELL));
+    var g = new Uint8Array(nc * nr);
+    if (grid) for (var r = 0; r < Math.min(rows, nr); r++) for (var c = 0; c < Math.min(cols, nc); c++) g[r * nc + c] = grid[r * cols + c];
+    cols = nc; rows = nr; grid = g; next = new Uint8Array(nc * nr);
+    if (!grid.some(function (v) { return v; })) seed();
+    draw();
+  }
+  function seed() {
+    grid.fill(0);
+    // a glider, a blinker and a random patch so there is something to look at
+    var cx = Math.floor(cols / 2), cy = Math.floor(rows / 2);
+    [[1,0],[2,1],[0,2],[1,2],[2,2]].forEach(function (p) { set(cx - 12 + p[0], cy - 8 + p[1], 1); });
+    [[0,0],[1,0],[2,0]].forEach(function (p) { set(cx + 8 + p[0], cy + 6, 1); });
+    for (var i = 0; i < cols * rows * 0.08; i++) set(Math.floor(Math.random() * cols), Math.floor(Math.random() * rows), 1);
+    gen = 0; updateGen();
+  }
+  function set(c, r, v) { if (c >= 0 && r >= 0 && c < cols && r < rows) grid[r * cols + c] = v; }
+  function stepOnce() {
+    for (var r = 0; r < rows; r++) {
+      var up = (r - 1 + rows) % rows, dn = (r + 1) % rows;
+      for (var c = 0; c < cols; c++) {
+        var lf = (c - 1 + cols) % cols, rt = (c + 1) % cols;
+        var n = grid[up*cols+lf] + grid[up*cols+c] + grid[up*cols+rt] + grid[r*cols+lf] + grid[r*cols+rt] + grid[dn*cols+lf] + grid[dn*cols+c] + grid[dn*cols+rt];
+        var alive = grid[r*cols+c];
+        next[r*cols+c] = (alive && (n === 2 || n === 3)) || (!alive && n === 3) ? 1 : 0;
+      }
+    }
+    var t = grid; grid = next; next = t; gen++; updateGen();
+  }
+  function draw() {
+    var w = canvas.clientWidth, h = canvas.clientHeight;
+    ctx.fillStyle = '#0c1122'; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(255,255,255,.05)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (var x = 0; x <= cols; x++) { ctx.moveTo(x * CELL + .5, 0); ctx.lineTo(x * CELL + .5, rows * CELL); }
+    for (var y = 0; y <= rows; y++) { ctx.moveTo(0, y * CELL + .5); ctx.lineTo(cols * CELL, y * CELL + .5); }
+    ctx.stroke();
+    ctx.fillStyle = '#ff7a1a';
+    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) if (grid[r * cols + c]) ctx.fillRect(c * CELL + 1.5, r * CELL + 1.5, CELL - 3, CELL - 3);
+  }
+  function updateGen() { document.getElementById('gen').textContent = gen; }
+  function loop(t) {
+    if (running) {
+      var speed = +document.getElementById('speed').value; // steps per second
+      acc += (t - last) / 1000 * speed;
+      while (acc >= 1) { stepOnce(); acc -= 1; }
+      draw();
+    }
+    last = t; requestAnimationFrame(loop);
+  }
+  var painting = false, paintValue = 1;
+  function cellAt(e) { var b = canvas.getBoundingClientRect(); return [Math.floor((e.clientX - b.left) / CELL), Math.floor((e.clientY - b.top) / CELL)]; }
+  canvas.addEventListener('pointerdown', function (e) { var p = cellAt(e); painting = true; paintValue = grid[p[1] * cols + p[0]] ? 0 : 1; set(p[0], p[1], paintValue); draw(); canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', function (e) { if (!painting) return; var p = cellAt(e); set(p[0], p[1], paintValue); draw(); });
+  canvas.addEventListener('pointerup', function () { painting = false; });
+  document.getElementById('play').addEventListener('click', function () { running = !running; this.textContent = running ? 'Pause' : 'Play'; });
+  document.getElementById('step').addEventListener('click', function () { stepOnce(); draw(); });
+  document.getElementById('random').addEventListener('click', function () { seed(); draw(); });
+  document.getElementById('clear').addEventListener('click', function () { grid.fill(0); gen = 0; updateGen(); draw(); });
+  window.addEventListener('resize', resize);
+  resize(); requestAnimationFrame(function (t) { last = t; loop(t); });
+})();
+</script>
+</body>
+</html>
