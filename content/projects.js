@@ -23,6 +23,31 @@
    ============================================================ */
 window.PROJECTS = [
   {
+    slug: "rngdle",
+    title: "RNGdle",
+    tagline: "A daily random-number game: roll once, collect badges for the patterns in your number, climb the leaderboard.",
+    date: "2025-09-15",
+    tech: ["JavaScript", "Number theory", "Firebase (optional)"],
+    embed: { type: "iframe", src: "demos/rngdle/index.html?embed=1", title: "RNGdle" },
+    description: `
+Roll a number from 0 to 1,000,000. The game checks it for **122 properties** — primes, palindromes,
+poker hands in the digits, numbers that tell the time, numbers that spell words on an upside-down
+calculator — and every property is a badge worth **EP**: 100 divided by the share of all rolls that
+earn it, so a one-in-a-thousand badge pays 100,000 EP and the number 2 is worth over a hundred million.
+
+The embed above is the practice version: unlimited rolls, badges, and your best and worst five.
+The full game adds a daily counted roll, a leaderboard, today's best roll, a badge catalogue and a profile.
+
+Every probability is exact: a script evaluates all 1,000,001 numbers in about twenty seconds.
+Badges are plain data, so adding one is a few lines.
+`,
+    links: [
+      { label: "Play the full game", url: "demos/rngdle/index.html" },
+      { label: "How it works & how to add badges", url: "https://github.com/Ryan-Sharma-123/Website/blob/HEAD/demos/rngdle/README.md" }
+    ],
+    featured: true
+  },
+  {
     slug: "game-of-life",
     title: "Conway's Game of Life",
     tagline: "A cellular automaton you can poke at. Click cells, hit play, watch gliders go.",

@@ -214,7 +214,9 @@
     var t = esc(title || 'Project preview');
     switch (embed.type) {
       case 'iframe':
-        return '<div class="embed"><iframe src="' + esc(embed.src) + '" title="' + t + '" loading="lazy" allow="fullscreen; autoplay; gamepad"></iframe></div>' +
+        var src = embed.src;
+        if (!/^https?:/i.test(src)) src += (src.indexOf('?') >= 0 ? '&' : '?') + 'theme=' + encodeURIComponent(currentTheme());
+        return '<div class="embed"><iframe src="' + esc(src) + '" title="' + t + '" loading="lazy" allow="fullscreen; autoplay; gamepad"></iframe></div>' +
           '<div class="embed-bar"><span class="live">Live demo · interactive</span><a href="' + esc(embed.src) + '" target="_blank" rel="noopener">Open full size ↗</a></div>';
       case 'youtube':
         return '<div class="embed"><iframe src="https://www.youtube-nocookie.com/embed/' + esc(embed.id) + '" title="' + t + '" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>' +

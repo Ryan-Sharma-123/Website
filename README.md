@@ -12,7 +12,7 @@ content/            ← everything you edit lives here
   blog.js           the blog posts
   about.js          the about page + résumé
 assets/images/      your pictures (profile photo, screenshots, post images)
-demos/              small interactive demos that get embedded on project pages
+demos/              small interactive demos that get embedded on project pages (demos/rngdle is a full game with its own README)
 css/, js/           the site's code (js/vendor/ holds Three.js for the 3D intro)
 ```
 
