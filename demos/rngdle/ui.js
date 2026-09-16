@@ -185,7 +185,7 @@
 
   /* ---------- leaderboard ---------- */
   function viewLeaderboard() {
-    var ranges = [['today', 'Today'], ['week', 'This week'], ['all', 'All-time'], ['lifetime', 'Lifetime EP']];
+    var ranges = [['today', 'Today'], ['week', 'This week'], ['all', 'All-time'], ['lifetime', 'Lifetime EP'], ['badges', 'Most badges']];
     $main.innerHTML = '<section class="card"><h2>Leaderboard</h2><div class="tabs">' + ranges.map(function (r) { return '<button type="button" data-range="' + r[0] + '"' + (S.lbRange === r[0] ? ' class="active"' : '') + '>' + r[1] + '</button>'; }).join('') + '</div><div id="lb" class="muted small">Loading…</div>' +
       (S.backend.kind === 'demo' ? '<p class="note" style="margin-top:.8rem">Other players are simulated (config.js → backend: "demo"). Connect Firebase for a real shared board.</p>' : '') + '</section>';
     $main.querySelectorAll('[data-range]').forEach(function (b) { b.addEventListener('click', function () { S.lbRange = b.dataset.range; viewLeaderboard(); }); });
@@ -219,8 +219,12 @@
   }
 
   /* ---------- profile ---------- */
-  function viewProfile() {
+  functifon viewProfile() {
     var p = S.backend.profile(), rs = countedRolls(), earned = Object.keys(earnedSet()).length;
+    var days = {}; rs.forEach(function (r) { days[r.date] = 1; });   // a set of dates with a roll
+    var streak = 0, d = new Date();
+    while (days[ST.dayKey(d)]) { streak++; d.setDate(d.getDate() - 1); }  // walk back day by day
+
     var best = rs.slice().sort(function (a, b) { return b.ep - a.ep; })[0];
     $main.innerHTML = '<section class="card"><h2>Profile</h2><div class="stack">' +
       '<div class="two"><div class="field"><label for="p-name">Name</label><input id="p-name" maxlength="24" value="' + esc(p.name) + '"></div><div class="field"><label for="p-flair">Flair (an emoji or two)</label><input id="p-flair" maxlength="8" value="' + esc(p.flair || '') + '"></div></div>' +
@@ -228,6 +232,7 @@
       '<div class="row"><button class="btn primary" id="p-save" type="button">Save</button><span class="note">' + (S.backend.kind === 'firebase' ? 'Shared with everyone on the leaderboard.' : 'Stored in this browser.') + '</span></div></div></section>' +
       '<section class="card"><h2>Stats</h2><div class="stats"><div class="stat"><span class="k">Counted rolls</span><div class="v">' + fmt(rs.length) + '</div></div><div class="stat"><span class="k">Lifetime EP</span><div class="v">' + fmt(S.backend.lifetimeEp()) + '</div></div><div class="stat"><span class="k">Best roll</span><div class="v">' + (best ? fmt(best.n) : '—') + '</div></div><div class="stat"><span class="k">Badges earned</span><div class="v">' + earned + '</div></div></div></section>' +
       '<section class="two">' + listsHtml() + '</section>' +
+      '<div class="stat"><span class="k">Streak</span><div class="v">' + streak + ' days</div></div>' +
       '<section class="card"><h2>History</h2>' + (rs.length ? '<div class="tablewrap"><table><thead><tr><th>Date</th><th>Number</th><th>Rarity</th><th>EP</th></tr></thead><tbody>' + rs.slice().reverse().slice(0, 30).map(function (r) { return '<tr><td class="mono small">' + esc(r.date) + '</td><td class="num">' + fmt(r.n) + '</td><td><span class="tt tier-' + esc(r.tier) + '">' + esc(r.tier) + '</span></td><td class="epc">' + fmt(r.ep) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">No counted rolls yet.</div>') +
       '<div class="row" style="margin-top:.8rem"><button class="btn" id="p-reset" type="button">Reset my rolls</button></div></section>';
     document.getElementById('p-save').addEventListener('click', function () {
