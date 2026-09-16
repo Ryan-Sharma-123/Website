@@ -32,7 +32,7 @@
   function nextMidnight() { var d = new Date(); d.setHours(24, 0, 0, 0); return d; }
   function hms(ms) { var s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 3600) + 'h ' + String(Math.floor(s / 60) % 60).padStart(2, '0') + 'm ' + String(s % 60).padStart(2, '0') + 's'; }
   function earnedSet() { var set = {}; countedRolls().forEach(function (r) { (r.badges || []).forEach(function (id) { set[id] = 1; }); }); return set; }
-  function chipHtml(b, i) { return '<span class="chip tier-' + (b.tier ? b.tier.id : 'common') + '" style="animation-delay:' + (i * 55) + 'ms" title="' + esc(b.description) + '"><span>' + esc(b.emoji) + '</span><span class="name">' + esc(b.name) + '</span><span class="epv">+' + fmt(b.ep) + '</span></span>'; }
+  function chipHtml(b, i, src) { return '<button type="button" class="chip tier-' + (b.tier ? b.tier.id : 'common') + '" style="animation-delay:' + (i * 55) + 'ms" data-badge="' + esc(b.id) + '" data-src="' + (src || 'def') + '" title="' + esc(b.description) + '"><span>' + esc(b.emoji) + '</span><span class="name">' + esc(b.name) + '</span><span class="epv">+' + fmt(b.ep) + '</span></button>'; }
 
   /* ---------- header ---------- */
   function renderTop() {
@@ -88,7 +88,7 @@
   function renderResult(animate) {
     var a = S.result, box = document.getElementById('result');
     if (!a || !box) return;
-    var chips = a.badges.map(chipHtml).join('');
+    var chips = a.badges.map(function (b, i) { return chipHtml(b, i, 'roll'); }).join('');
     box.innerHTML = tierHtml(a.tier, a.topShare) +
       '<div class="ep" id="ep">' + (animate ? '0' : fmt(a.ep)) + '<small>EP</small></div>' +
       (S.practice ? '<div class="note">Practice roll — not saved, not on the leaderboard.</div>' : '') +
@@ -105,7 +105,7 @@
   }
   function bcardHtml(b, i) {
     var digits = S.result.s.split('');
-    return '<div class="bcard" data-hl="' + b.highlight.join(',') + '" style="animation-delay:' + (i * 60) + 'ms"><div class="bhead"><span class="emoji">' + esc(b.emoji) + '</span><span class="name">' + esc(b.name) + '</span>' +
+    return '<div class="bcard" data-hl="' + b.highlight.join(',') + '" data-badge="' + esc(b.id) + '" data-src="roll" role="button" tabindex="0" style="animation-delay:' + (i * 60) + 'ms"><div class="bhead"><span class="emoji">' + esc(b.emoji) + '</span><span class="name">' + esc(b.name) + '</span>' +
       (b.tier ? '<span class="tier tier-' + b.tier.id + '">' + esc(b.tier.name) + '</span>' : '') + '<span class="bep">+' + fmt(b.ep) + ' EP</span></div>' +
       '<div class="bdesc">' + esc(b.description) + '</div>' +
       '<div class="bdigits">' + digits.map(function (d, j) { return '<span' + (b.highlight.indexOf(j) >= 0 ? ' class="on"' : '') + '>' + d + '</span>'; }).join('') + (b.detail ? '<span class="detail' + (b.detail.length > 14 ? ' long' : '') + '">' + esc(b.detail) + '</span>' : '') + '</div></div>';
@@ -177,8 +177,9 @@
       var e = res[0], count = res[1];
       if (!e) { box.innerHTML = '<h2>Today’s best roll</h2><div class="empty">Nobody has rolled yet today. Be first.</div>'; return; }
       var a = E.analyze(e.n, S.rarity, CFG);
+      S.bestAnalysis = a;
       box.innerHTML = '<h2>Today’s best roll</h2><div class="best-card"><span class="num">' + fmt(e.n) + '</span><span class="by">rolled by <b>' + esc(e.name) + (e.flair ? ' ' + esc(e.flair) : '') + '</b>' + (e.me ? ' (you!)' : '') + '</span>' +
-        tierHtml(a.tier, a.topShare) + '<div class="chips">' + a.badges.slice(0, 7).map(chipHtml).join('') + (a.badges.length > 7 ? '<span class="note">+' + (a.badges.length - 7) + ' more</span>' : '') + '</div>' +
+        tierHtml(a.tier, a.topShare) + '<div class="chips">' + a.badges.slice(0, 7).map(function (b, i) { return chipHtml(b, i, 'best'); }).join('') + (a.badges.length > 7 ? '<span class="note">+' + (a.badges.length - 7) + ' more</span>' : '') + '</div>' +
         '<span class="ep">' + fmt(e.ep) + '<small>EP</small></span><span class="note">' + fmt(count) + ' rolls today' + (S.backend.kind === 'demo' ? ' · other players are simulated' : '') + '</span></div>';
     }).catch(function () { box.innerHTML = '<h2>Today’s best roll</h2><div class="empty">Leaderboard unavailable right now.</div>'; });
   }
@@ -212,7 +213,7 @@
         var list = cats[c].slice().sort(function (a, b) { return S.rarity.p[a.id] - S.rarity.p[b.id]; });
         return '<div class="cat"><h3>' + esc(c) + '</h3><p class="cd">' + esc(B.CATEGORIES[c] || '') + '</p><div class="grid">' + list.map(function (b) {
           var p = S.rarity.p[b.id], t = E.badgeTier(p);
-          return '<div class="bmini' + (earned[b.id] ? ' earned' : '') + '" title="' + esc(b.description) + '"><span class="e">' + esc(b.emoji) + '</span><span><span class="n">' + esc(b.name) + (earned[b.id] ? ' ✓' : '') + '</span><br><span class="d">' + esc(b.description) + '</span></span><span class="r tier-' + t.id + '">' + t.name + '<b>' + fmt(E.epFor(p, CFG)) + ' EP</b></span></div>';
+          return '<button type="button" class="bmini' + (earned[b.id] ? ' earned' : '') + '" data-badge="' + esc(b.id) + '" data-src="def" title="' + esc(b.description) + '"><span class="e">' + esc(b.emoji) + '</span><span><span class="n">' + esc(b.name) + (earned[b.id] ? ' ✓' : '') + '</span><br><span class="d">' + esc(b.description) + '</span></span><span class="r tier-' + t.id + '">' + t.name + '<b>' + fmt(E.epFor(p, CFG)) + ' EP</b></span></button>';
         }).join('') + '</div></div>';
       }).join('') + '</div></section>';
     $main.innerHTML = html;
@@ -251,6 +252,48 @@
       '<p class="muted">' + B.BADGES.length + ' badges. Median roll: ' + fmt(S.rarity.quantiles[500]) + ' EP. Best possible roll: ' + (S.rarity.bestRoll ? fmt(S.rarity.bestRoll.n) + ' (' + fmt(S.rarity.bestRoll.ep) + ' EP)' : '—') + '.' + (S.rarity.estimated ? ' Rarities are estimated from ' + fmt(S.rarity.samples) + ' samples; run tools/compute-rarity.js for exact values.' : '') + '</p>' +
       '</div></section>';
   }
+
+  /* ---------- badge popover: click any badge chip or card to read about it ---------- */
+  var pop = null;
+  function ensurePop() {
+    if (pop) return pop;
+    var back = document.createElement('div'); back.className = 'pop-back'; back.id = 'pop-back';
+    back.innerHTML = '<div class="pop" role="dialog" aria-modal="true" aria-labelledby="pop-title" id="pop"></div>';
+    document.body.appendChild(back);
+    back.addEventListener('click', function (e) { if (e.target === back) closePop(); });
+    pop = back;
+    return pop;
+  }
+  function probText(p) {
+    if (!(p > 0)) return 'no roll earns it';
+    return p >= 0.01 ? (p * 100).toFixed(p >= 0.1 ? 0 : 1) + '% of rolls' : '1 in ' + fmt(Math.round(1 / p)) + ' rolls';
+  }
+  /** id = badge id; src = 'roll' (current roll), 'best' (today's best roll) or 'def' (just the definition). */
+  function showBadge(id, src) {
+    var def = badgeById(id); if (!def) return;
+    var fromRoll = null, digits = null;
+    if (src === 'roll' && S.result) { fromRoll = S.result.badges.filter(function (b) { return b.id === id; })[0]; digits = S.result.s.split(''); }
+    if (src === 'best' && S.bestAnalysis) { fromRoll = S.bestAnalysis.badges.filter(function (b) { return b.id === id; })[0]; digits = S.bestAnalysis.s.split(''); }
+    var p = S.rarity.p[id], tier = p > 0 ? E.badgeTier(p) : null, ep = E.epFor(p || 0, CFG);
+    var earned = !!earnedSet()[id];
+    var box = ensurePop().querySelector('#pop');
+    box.innerHTML = '<div class="pop-head"><span class="pop-emoji">' + esc(def.emoji) + '</span><div><div class="pop-title" id="pop-title">' + esc(def.name) + '</div><div class="pop-cat">' + esc(def.category) + '</div></div><button type="button" class="pop-x" id="pop-x" aria-label="Close">×</button></div>' +
+      '<div class="pop-row">' + (tier ? '<span class="tierpill tier-' + tier.id + '"><span class="t">' + tier.name + '</span></span>' : '') + '<span class="pop-ep">+' + fmt(ep) + ' EP</span><span class="pop-p">' + probText(p) + '</span></div>' +
+      '<p class="pop-desc">' + esc(def.description) + '</p>' +
+      (fromRoll && digits ? '<div class="bdigits">' + digits.map(function (d, j) { return '<span' + (fromRoll.highlight.indexOf(j) >= 0 ? ' class="on"' : '') + '>' + d + '</span>'; }).join('') + (fromRoll.detail ? '<span class="detail' + (fromRoll.detail.length > 14 ? ' long' : '') + '">' + esc(fromRoll.detail) + '</span>' : '') + '</div>' : '') +
+      '<div class="pop-foot">' + (earned ? '✓ In your collection' : 'Not in your collection yet') + '</div>';
+    ensurePop().classList.add('show');
+    var x = document.getElementById('pop-x'); x.addEventListener('click', closePop); x.focus();
+  }
+  function closePop() { if (pop) pop.classList.remove('show'); }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-badge]');
+    if (t) { e.preventDefault(); showBadge(t.dataset.badge, t.dataset.src); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closePop();
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.bcard[data-badge]')) { e.preventDefault(); showBadge(e.target.dataset.badge, e.target.dataset.src); }
+  });
 
   /* ---------- boot ---------- */
   function render() {

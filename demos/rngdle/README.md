@@ -51,7 +51,9 @@ all count.
 
 Add an entry to the `BADGES` list. The helper `B(id, name, emoji, category, description, test)` builds it.
 The `test` receives `x` and returns `false`, `true`, or an object with `highlight` (which digit positions to
-light up) and `detail` (a short note shown under the badge).
+light up) and `detail` (a short note shown under the badge). Clicking any badge chip or card opens a popover that
+shows the badge's emoji, name, category, tier, EP, how many rolls earn it, and this same `description` and
+`detail`, so there is nothing extra to write for the popover.
 
 ```js
 B('digital-root-9', 'Root Nine', '🌱', 'Basic Physics', 'The digits keep adding up to 9.', function (x) {
