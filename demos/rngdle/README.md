@@ -25,7 +25,7 @@ demos/rngdle/
 appears, and so on) and runs every badge's `test(x)` from `badges.js`. Each badge that fires is looked up in
 `data/rarity.js` to find its **probability** `p` (the share of all 1,000,001 numbers that earn it), which turns
 into **EP = 100 ÷ p**. The EPs are summed, and the total is compared against the EP of every possible roll to
-give the roll a **rarity tier** and a "top X%". `storage.js` then saves the roll and answers questions like
+give the roll a **rarity tier** and a "top X%" (or "bottom X%" for the weaker half). `storage.js` then saves the roll and answers questions like
 "who rolled best today?" from whichever backend is configured. That is the whole game.
 
 ## Add a badge for one specific number
@@ -96,6 +96,10 @@ Commit the regenerated `data/rarity.js` with your badge.
 | `theme` | Accent colours for the dark theme (and `accentLight` / `accent2Light` for light). |
 
 Rarity tiers live at the top of `engine.js` (`BADGE_TIERS` by probability, `ROLL_TIERS` by rank).
+
+Roll tiers, from best to worst: Mythic (top 1%), Anomaly (top 1–5%), Epic (top 5–10%), Rare (top 10–25%),
+Uncommon (top 25–50%), Common (bottom 50–25%), Bland (bottom 25–10%), Junk (bottom 10–1%), Trash (bottom 1%).
+A saved roll's tier is recomputed from its EP whenever it is shown, so changing the table re-ranks old rolls too.
 
 ## Real shared leaderboards with Firebase (about 10 minutes, free)
 

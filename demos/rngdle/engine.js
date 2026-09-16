@@ -23,13 +23,15 @@
   ];
   // Roll rarity by how the roll's total EP ranks against every possible roll (top share).
   var ROLL_TIERS = [
-    { id: 'mythic', name: 'Mythic', top: 0.01 },
-    { id: 'anomaly', name: 'Anomaly', top: 0.05 },
-    { id: 'epic', name: 'Epic', top: 0.10 },
-    { id: 'rare', name: 'Rare', top: 0.25 },
-    { id: 'uncommon', name: 'Uncommon', top: 0.50 },
-    { id: 'common', name: 'Common', top: 0.99 },
-    { id: 'trash', name: 'Trash', top: 1.01 }
+    { id: 'mythic', name: 'Mythic', top: 0.01, rank: 'top 1%' },
+    { id: 'anomaly', name: 'Anomaly', top: 0.05, rank: 'top 1–5%' },
+    { id: 'epic', name: 'Epic', top: 0.10, rank: 'top 5–10%' },
+    { id: 'rare', name: 'Rare', top: 0.25, rank: 'top 10–25%' },
+    { id: 'uncommon', name: 'Uncommon', top: 0.50, rank: 'top 25–50%' },
+    { id: 'common', name: 'Common', top: 0.75, rank: 'bottom 50–25%' },
+    { id: 'bland', name: 'Bland', top: 0.90, rank: 'bottom 25–10%' },
+    { id: 'junk', name: 'Junk', top: 0.99, rank: 'bottom 10–1%' },
+    { id: 'trash', name: 'Trash', top: 1.01, rank: 'bottom 1%' }
   ];
 
   function context(n) {
@@ -119,5 +121,12 @@
     step();
   }
 
-  return { analyze: analyze, hits: hits, context: context, badgeTier: badgeTier, rollTier: rollTier, topShare: topShare, epFor: epFor, randomInt: randomInt, isStale: isStale, estimate: estimate, BADGE_TIERS: BADGE_TIERS, ROLL_TIERS: ROLL_TIERS };
+  /** "top 13%" for the upper half, "bottom 11%" for the lower half. share = share of rolls at least as good. */
+  function rankText(share) {
+    function f(p) { return (p < 1 ? (p < 0.1 ? p.toFixed(2) : p.toFixed(1)).replace(/\.?0+$/, '') : String(Math.round(p))) + '%'; }
+    var top = share * 100;
+    if (top <= 50) return 'top ' + f(top);
+    return 'bottom ' + f(Math.max(0.01, 100 - top));
+  }
+  return { analyze: analyze, rankText: rankText, hits: hits, context: context, badgeTier: badgeTier, rollTier: rollTier, topShare: topShare, epFor: epFor, randomInt: randomInt, isStale: isStale, estimate: estimate, BADGE_TIERS: BADGE_TIERS, ROLL_TIERS: ROLL_TIERS };
 });

@@ -20,12 +20,15 @@
   /* ---------- helpers ---------- */
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function fmt(n) { return (n || 0).toLocaleString(); }
-  function pct(share) { var p = share * 100; return p < 1 ? 'top ' + p.toFixed(1).replace(/\.0$/, '') + '%' : p >= 99 ? 'bottom 1%' : 'top ' + Math.round(p) + '%'; }
+  function pct(share) { return E.rankText(share); }
   function toast(msg) { $toast.textContent = msg; $toast.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(function () { $toast.classList.remove('show'); }, 1800); }
   function el(html) { var t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; }
   function tierHtml(tier, share) { return tier ? '<span class="tierpill tier-' + tier.id + '"><span class="t">' + esc(tier.name) + '</span>' + (share != null ? '<span class="pct">' + pct(share) + '</span>' : '') + '</span>' : ''; }
   function badgeById(id) { for (var i = 0; i < B.BADGES.length; i++) if (B.BADGES[i].id === id) return B.BADGES[i]; return null; }
   function analyzeStored(r) { return E.analyze(r.n, S.rarity, CFG); }
+  // A saved roll's tier is recomputed from its EP so old rolls follow the current tier table.
+  function tierOf(r) { return E.rollTier(E.topShare(r.ep, S.rarity.quantiles)); }
+  function tierTag(r) { var t = tierOf(r); return '<span class="tt tier-' + t.id + '">' + esc(t.name) + '</span>'; }
   function countedRolls() { return S.backend.rolls(); }
   function todayRoll() { var d = ST.dayKey(); var rs = countedRolls(); for (var i = rs.length - 1; i >= 0; i--) if (rs[i].date === d) return rs[i]; return null; }
   function canCount() { return MODE === 'free' || !todayRoll(); }
@@ -82,7 +85,7 @@
     if (!rs.length) return '<section class="card"><h2>Your best 5</h2><div class="empty">No counted rolls yet.</div></section><section class="card"><h2>Your worst 5</h2><div class="empty">Roll to find out.</div></section>';
     var best = rs.slice().sort(function (a, b) { return b.ep - a.ep; }).slice(0, 5);
     var worst = rs.slice().sort(function (a, b) { return a.ep - b.ep; }).slice(0, 5);
-    function li(list) { return '<div class="list">' + list.map(function (r, i) { return '<div class="li"><span class="rk">' + (i + 1) + '</span><span><span class="num">' + fmt(r.n) + '</span> <span class="tt tier-' + esc(r.tier) + '">' + esc(r.tier) + '</span></span><span class="ep2">' + fmt(r.ep) + ' EP</span></div>'; }).join('') + '</div>'; }
+    function li(list) { return '<div class="list">' + list.map(function (r, i) { return '<div class="li"><span class="rk">' + (i + 1) + '</span><span><span class="num">' + fmt(r.n) + '</span> ' + tierTag(r) + '</span><span class="ep2">' + fmt(r.ep) + ' EP</span></div>'; }).join('') + '</div>'; }
     return '<section class="card"><h2>Your best 5</h2>' + li(best) + '</section><section class="card"><h2>Your worst 5</h2>' + li(worst) + '</section>';
   }
   function renderResult(animate) {
@@ -233,7 +236,7 @@
       '<div class="row"><button class="btn primary" id="p-save" type="button">Save</button><span class="note">' + (S.backend.kind === 'firebase' ? 'Shared with everyone on the leaderboard.' : 'Stored in this browser.') + '</span></div></div></section>' +
       '<section class="card"><h2>Stats</h2><div class="stats"><div class="stat"><span class="k">Counted rolls</span><div class="v">' + fmt(rs.length) + '</div></div><div class="stat"><span class="k">Lifetime EP</span><div class="v">' + fmt(S.backend.lifetimeEp()) + '</div></div><div class="stat"><span class="k">Best roll</span><div class="v">' + (best ? fmt(best.n) : '—') + '</div></div><div class="stat"><span class="k">Badges earned</span><div class="v">' + earned + '</div></div><div class="stat"><span class="k">Streak</span><div class="v">' + streak + ' day' + (streak === 1 ? '' : 's') + '</div></div></div></section>' +
       '<section class="two">' + listsHtml() + '</section>' +
-      '<section class="card"><h2>History</h2>' + (rs.length ? '<div class="tablewrap"><table><thead><tr><th>Date</th><th>Number</th><th>Rarity</th><th>EP</th></tr></thead><tbody>' + rs.slice().reverse().slice(0, 30).map(function (r) { return '<tr><td class="mono small">' + esc(r.date) + '</td><td class="num">' + fmt(r.n) + '</td><td><span class="tt tier-' + esc(r.tier) + '">' + esc(r.tier) + '</span></td><td class="epc">' + fmt(r.ep) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">No counted rolls yet.</div>') +
+      '<section class="card"><h2>History</h2>' + (rs.length ? '<div class="tablewrap"><table><thead><tr><th>Date</th><th>Number</th><th>Rarity</th><th>EP</th></tr></thead><tbody>' + rs.slice().reverse().slice(0, 30).map(function (r) { return '<tr><td class="mono small">' + esc(r.date) + '</td><td class="num">' + fmt(r.n) + '</td><td>' + tierTag(r) + '</td><td class="epc">' + fmt(r.ep) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">No counted rolls yet.</div>') +
       '<div class="row" style="margin-top:.8rem"><button class="btn" id="p-reset" type="button">Reset my rolls</button></div></section>';
     document.getElementById('p-save').addEventListener('click', function () {
       S.backend.saveProfile({ name: document.getElementById('p-name').value.trim() || 'You', flair: document.getElementById('p-flair').value.trim(), tagline: document.getElementById('p-tag').value.trim() }).then(function () { toast('Profile saved'); }, function () { toast('Saved locally only'); });
@@ -248,7 +251,7 @@
       '<p><b>Badge rarity</b> is the share of all possible rolls that earn the badge, and EP is ' + (CFG.epPerProbability || 100) + ' divided by that share, so a badge that 1% of rolls earn is worth ' + fmt((CFG.epPerProbability || 100) * 100) + ' EP.</p>' +
       '<div class="tablewrap"><table><thead><tr><th>Badge tier</th><th>Share of rolls</th></tr></thead><tbody>' + E.BADGE_TIERS.map(function (t) { return '<tr><td class="tt tier-' + t.id + '">' + t.name + '</td><td class="small">' + t.blurb + '</td></tr>'; }).join('') + '</tbody></table></div>' +
       '<p><b>Roll rarity</b> ranks your total EP against every possible roll:</p>' +
-      '<div class="tablewrap"><table><thead><tr><th>Roll tier</th><th>Rank</th></tr></thead><tbody>' + E.ROLL_TIERS.map(function (t, i) { var prev = i ? E.ROLL_TIERS[i - 1].top : 0; return '<tr><td class="tt tier-' + t.id + '">' + t.name + '</td><td class="small">' + (t.id === 'trash' ? 'bottom 1%' : 'top ' + Math.round(prev * 100) + '–' + Math.round(t.top * 100) + '%') + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+      '<div class="tablewrap"><table><thead><tr><th>Roll tier</th><th>Rank</th></tr></thead><tbody>' + E.ROLL_TIERS.map(function (t) { return '<tr><td class="tt tier-' + t.id + '">' + t.name + '</td><td class="small">' + t.rank + '</td></tr>'; }).join('') + '</tbody></table></div>' +
       '<p class="muted">' + B.BADGES.length + ' badges. Median roll: ' + fmt(S.rarity.quantiles[500]) + ' EP. Best possible roll: ' + (S.rarity.bestRoll ? fmt(S.rarity.bestRoll.n) + ' (' + fmt(S.rarity.bestRoll.ep) + ' EP)' : '—') + '.' + (S.rarity.estimated ? ' Rarities are estimated from ' + fmt(S.rarity.samples) + ' samples; run tools/compute-rarity.js for exact values.' : '') + '</p>' +
       '</div></section>';
   }
