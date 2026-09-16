@@ -7,11 +7,11 @@
     mode: 'daily',                  // 'daily': one counted roll per day, then practice rolls; 'free': every roll counts
     embedMode: 'free',              // mode used inside the projects page (index.html?embed=1)
     epPerProbability: 100,          // EP for a badge = this ÷ probability. 100 → a 1% badge is worth 10,000 EP
-    backend: 'demo',                // 'demo': simulated other players (works anywhere)
+    backend: 'firebase',                // 'demo': simulated other players (works anywhere)
                                     // 'local': only you, saved in this browser
                                     // 'firebase': real shared leaderboards (see README for the 10-minute setup)
     firebase: {                     // only used when backend is 'firebase'
-      apiKey: '', authDomain: '', databaseURL: '', projectId: '', appId: ''
+      apiKey: 'AIzaSyARFJcbCNd4K0NsopwzoZff4LlUspiWX20', authDomain: 'rngdlee.firebaseapp.com', databaseURL: 'https://rngdlee-default-rtdb.firebaseio.com', projectId: 'rngdlee', appId: '1:48345095823:web:9286a9b9a1c49fc3f45afa'
     },
     demoPlayers: 40,                // how many simulated players the demo backend shows
     leaderboardSize: 50,
