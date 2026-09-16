@@ -280,7 +280,7 @@
     box.innerHTML = '<div class="pop-head"><span class="pop-emoji">' + esc(def.emoji) + '</span><div><div class="pop-title" id="pop-title">' + esc(def.name) + '</div><div class="pop-cat">' + esc(def.category) + '</div></div><button type="button" class="pop-x" id="pop-x" aria-label="Close">×</button></div>' +
       '<div class="pop-row">' + (tier ? '<span class="tierpill tier-' + tier.id + '"><span class="t">' + tier.name + '</span></span>' : '') + '<span class="pop-ep">+' + fmt(ep) + ' EP</span><span class="pop-p">' + probText(p) + '</span></div>' +
       '<p class="pop-desc">' + esc(def.description) + '</p>' +
-      (fromRoll && digits ? '<div class="bdigits">' + digits.map(function (d, j) { return '<span' + (fromRoll.highlight.indexOf(j) >= 0 ? ' class="on"' : '') + '>' + d + '</span>'; }).join('') + (fromRoll.detail ? '<span class="detail' + (fromRoll.detail.length > 14 ? ' long' : '') + '">' + esc(fromRoll.detail) + '</span>' : '') + '</div>' : '') +
+      (fromRoll && digits ? '<div class="bdigits">' + digits.map(function (d, j) { return '<span' + (fromRoll.highlight.indexOf(j) >= 0 ? ' class="on"' : '') + '>' + d + '</span>'; }).join('') + (fromRoll.detail ? '<span class="detail long">' + esc(fromRoll.detail) + '</span>' : '') + '</div>' : '') +
       '<div class="pop-foot">' + (earned ? '✓ In your collection' : 'Not in your collection yet') + '</div>';
     ensurePop().classList.add('show');
     var x = document.getElementById('pop-x'); x.addEventListener('click', closePop); x.focus();
