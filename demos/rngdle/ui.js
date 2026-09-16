@@ -194,10 +194,10 @@
       if (!list.length) { box.innerHTML = '<div class="empty">Nothing here yet.</div>'; return; }
       var medals = ['🥇', '🥈', '🥉'];
       box.className = 'tablewrap';
-      box.innerHTML = '<table><thead><tr><th>#</th><th>Player</th><th>' + (S.lbRange === 'lifetime' ? 'Rolls' : 'Number') + '</th><th>EP</th></tr></thead><tbody>' + list.map(function (e, i) {
+      box.innerHTML = '<table><thead><tr><th>#</th><th>Player</th><th>' + (S.lbRange === 'lifetime' ? 'Rolls' : S.lbRange === 'badges' ? 'Badges' : 'Number') + '</th><th>EP</th></tr></thead><tbody>' + list.map(function (e, i) {
         var t = e.n != null ? E.rollTier(E.topShare(e.ep, S.rarity.quantiles)) : null;
         return '<tr' + (e.me ? ' class="me"' : '') + '><td class="mono">' + (medals[i] || '#' + (i + 1)) + '</td><td><b>' + esc(e.name) + '</b>' + (e.flair ? '<span class="flair">' + esc(e.flair) + '</span>' : '') + (e.tagline ? '<span class="tag">' + esc(e.tagline) + '</span>' : '') + '</td>' +
-          '<td class="num">' + (e.n != null ? fmt(e.n) + (t ? ' <span class="tt tier-' + t.id + '" style="font-size:.58rem;letter-spacing:.1em;text-transform:uppercase">' + t.name + '</span>' : '') : fmt(e.rolls) + ' rolls') + '</td><td class="epc">' + fmt(e.ep) + ' EP</td></tr>';
+          '<td class="num">' + (S.lbRange === 'badges' ? (e.badges || []).length + ' badges · ' + fmt(e.n) : e.n != null ? fmt(e.n) + (t ? ' <span class="tt tier-' + t.id + '" style="font-size:.58rem;letter-spacing:.1em;text-transform:uppercase">' + t.name + '</span>' : '') : fmt(e.rolls) + ' rolls') + '</td><td class="epc">' + fmt(e.ep) + ' EP</td></tr>';
       }).join('') + '</tbody></table>';
     }).catch(function () { var box = document.getElementById('lb'); if (box) box.innerHTML = '<div class="empty">Could not load the leaderboard.</div>'; });
   }
@@ -219,7 +219,7 @@
   }
 
   /* ---------- profile ---------- */
-  functifon viewProfile() {
+  function viewProfile() {
     var p = S.backend.profile(), rs = countedRolls(), earned = Object.keys(earnedSet()).length;
     var days = {}; rs.forEach(function (r) { days[r.date] = 1; });   // a set of dates with a roll
     var streak = 0, d = new Date();
@@ -230,9 +230,8 @@
       '<div class="two"><div class="field"><label for="p-name">Name</label><input id="p-name" maxlength="24" value="' + esc(p.name) + '"></div><div class="field"><label for="p-flair">Flair (an emoji or two)</label><input id="p-flair" maxlength="8" value="' + esc(p.flair || '') + '"></div></div>' +
       '<div class="field"><label for="p-tag">Tagline</label><input id="p-tag" maxlength="60" value="' + esc(p.tagline || '') + '" placeholder="shown on the leaderboard"></div>' +
       '<div class="row"><button class="btn primary" id="p-save" type="button">Save</button><span class="note">' + (S.backend.kind === 'firebase' ? 'Shared with everyone on the leaderboard.' : 'Stored in this browser.') + '</span></div></div></section>' +
-      '<section class="card"><h2>Stats</h2><div class="stats"><div class="stat"><span class="k">Counted rolls</span><div class="v">' + fmt(rs.length) + '</div></div><div class="stat"><span class="k">Lifetime EP</span><div class="v">' + fmt(S.backend.lifetimeEp()) + '</div></div><div class="stat"><span class="k">Best roll</span><div class="v">' + (best ? fmt(best.n) : '—') + '</div></div><div class="stat"><span class="k">Badges earned</span><div class="v">' + earned + '</div></div></div></section>' +
+      '<section class="card"><h2>Stats</h2><div class="stats"><div class="stat"><span class="k">Counted rolls</span><div class="v">' + fmt(rs.length) + '</div></div><div class="stat"><span class="k">Lifetime EP</span><div class="v">' + fmt(S.backend.lifetimeEp()) + '</div></div><div class="stat"><span class="k">Best roll</span><div class="v">' + (best ? fmt(best.n) : '—') + '</div></div><div class="stat"><span class="k">Badges earned</span><div class="v">' + earned + '</div></div><div class="stat"><span class="k">Streak</span><div class="v">' + streak + ' day' + (streak === 1 ? '' : 's') + '</div></div></div></section>' +
       '<section class="two">' + listsHtml() + '</section>' +
-      '<div class="stat"><span class="k">Streak</span><div class="v">' + streak + ' days</div></div>' +
       '<section class="card"><h2>History</h2>' + (rs.length ? '<div class="tablewrap"><table><thead><tr><th>Date</th><th>Number</th><th>Rarity</th><th>EP</th></tr></thead><tbody>' + rs.slice().reverse().slice(0, 30).map(function (r) { return '<tr><td class="mono small">' + esc(r.date) + '</td><td class="num">' + fmt(r.n) + '</td><td><span class="tt tier-' + esc(r.tier) + '">' + esc(r.tier) + '</span></td><td class="epc">' + fmt(r.ep) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">No counted rolls yet.</div>') +
       '<div class="row" style="margin-top:.8rem"><button class="btn" id="p-reset" type="button">Reset my rolls</button></div></section>';
     document.getElementById('p-save').addEventListener('click', function () {

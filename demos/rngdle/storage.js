@@ -42,7 +42,7 @@
       var mine = this.myEntries(range === 'today' ? [dayKey()] : range === 'week' ? lastDays(7) : null);
       var entry = bestOf(mine);
       if (range === 'lifetime' && state.rolls.length) entry = Object.assign({}, mine[0] || {}, { ep: lifetime(), n: null });
-      if (range === 'badges') return Promise.resolve(perPlayerBest(entries).sort(function (a, b) { return b.badges.length - a.badges.length; }).slice(0, limit));
+      if (range === 'badges') { var mostB = bestOf(mine.map(function (e) { return Object.assign({}, e, { ep: (e.badges || []).length }); })); entry = mostB && mine.filter(function (e) { return e.n === mostB.n && e.date === mostB.date; })[0]; }
       return Promise.resolve(entry ? [entry] : []);
     };
     this.reset = function () { state = { profile: state.profile, rolls: [] }; save(state); };
@@ -103,6 +103,7 @@
         entries.forEach(function (e) { if (!sums[e.id]) sums[e.id] = Object.assign({}, e, { ep: 0, n: null, rolls: 0 }); sums[e.id].ep += e.ep; sums[e.id].rolls++; });
         return Promise.resolve(sortDesc(Object.keys(sums).map(function (k) { return sums[k]; })).slice(0, limit));
       }
+      if (range === 'badges') return Promise.resolve(perPlayerBest(entries).sort(function (a, b) { return (b.badges || []).length - (a.badges || []).length || b.ep - a.ep; }).slice(0, limit));
       return Promise.resolve(sortDesc(perPlayerBest(entries)).slice(0, limit));
     };
   }
@@ -161,6 +162,7 @@
         if (range === 'week') return Promise.all(lastDays(7).map(function (d) { return db.ref('rolls/' + d).orderByChild('ep').limitToLast(limit).once('value').then(function (s) { return toEntries(s.val()).map(function (e) { e.date = d; return e; }); }); }))
           .then(function (lists) { var all = [].concat.apply([], lists), best = {}; all.forEach(function (e) { if (!best[e.id] || e.ep > best[e.id].ep) best[e.id] = e; }); return sortDesc(Object.keys(best).map(function (k) { return best[k]; })).slice(0, limit); });
         if (range === 'lifetime') return db.ref('players').orderByChild('lifetimeEp').limitToLast(limit).once('value').then(function (s) { return sortDesc(toEntries(s.val(), function (v) { return { ep: v.lifetimeEp || 0, n: null, rolls: v.rolls || 0 }; })).slice(0, limit); });
+        if (range === 'badges') return db.ref('players').orderByChild('best/ep').limitToLast(500).once('value').then(function (s) { return toEntries(s.val(), function (v) { var b = v.best || {}; return { n: b.n, ep: b.ep || 0, badges: b.badges || [], date: b.date, rolls: v.rolls || 0 }; }).sort(function (a, b) { return b.badges.length - a.badges.length || b.ep - a.ep; }).slice(0, limit); });
         return db.ref('players').orderByChild('best/ep').limitToLast(limit).once('value').then(function (s) { return sortDesc(toEntries(s.val(), function (v) { var b = v.best || {}; return { n: b.n, ep: b.ep || 0, badges: b.badges || [], date: b.date, rolls: v.rolls || 0 }; })).slice(0, limit); });
       });
     };
