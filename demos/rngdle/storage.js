@@ -42,6 +42,7 @@
       var mine = this.myEntries(range === 'today' ? [dayKey()] : range === 'week' ? lastDays(7) : null);
       var entry = bestOf(mine);
       if (range === 'lifetime' && state.rolls.length) entry = Object.assign({}, mine[0] || {}, { ep: lifetime(), n: null });
+      if (range === 'badges') return Promise.resolve(perPlayerBest(entries).sort(function (a, b) { return b.badges.length - a.badges.length; }).slice(0, limit));
       return Promise.resolve(entry ? [entry] : []);
     };
     this.reset = function () { state = { profile: state.profile, rolls: [] }; save(state); };
